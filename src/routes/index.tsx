@@ -50,11 +50,11 @@ function ClubApp() {
 
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <button className="lg:hidden" onClick={() => setNavOpen((v) => !v)} aria-label="menu">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
+          <button className="shrink-0 lg:hidden" onClick={() => setNavOpen((v) => !v)} aria-label="menu">
             {navOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground font-black">
               🏀
             </div>
@@ -63,9 +63,9 @@ function ClubApp() {
               <div className="truncate text-[11px] text-muted-foreground">Gestión integral · prototipo</div>
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
             <Select value={user.id} onValueChange={(id) => clubStore.set((s) => { s.currentUserId = id; })}>
-              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="flex-1 sm:w-[200px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {users.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
