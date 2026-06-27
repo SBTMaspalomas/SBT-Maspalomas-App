@@ -217,7 +217,10 @@ export const clubStore = {
 
 export function useClub<T>(selector: (s: ClubState) => T): T {
   return useSyncExternalStore(
-    (cb) => { const u = clubStore.subscribe(cb); return () => { u; }; },
+    (cb) => {
+      const unsub = clubStore.subscribe(cb);
+      return () => { unsub(); };
+    },
     () => selector(clubStore.get()),
     () => selector(state),
   );
