@@ -1,17 +1,18 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { clubStore, useClub, currentUser, type Role } from "@/lib/clubStore";
+import { clubStore, useClub, currentUser } from "@/lib/clubStore";
+import { useAuth } from "@/lib/auth-context";
 import { RegistrationFlow } from "@/components/club/RegistrationFlow";
 import { ValidationConsole } from "@/components/club/ValidationConsole";
 import { PaymentsAdmin, PaymentsParent } from "@/components/club/Payments";
 import { Attendance } from "@/components/club/Attendance";
 import { Chats } from "@/components/club/Chats";
 import { Board } from "@/components/club/Board";
+import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
