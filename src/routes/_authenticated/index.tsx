@@ -38,12 +38,21 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
 ];
 
 function ClubApp() {
+  const auth = useAuth();
+  const navigate = useNavigate();
   const user = useClub(currentUser);
-  const users = useClub((s) => s.users);
   const [view, setView] = useState<View>("inicio");
   const [navOpen, setNavOpen] = useState(false);
 
   const items = NAV.filter((n) => n.roles.includes(user.role));
+  const displayName = auth.fullName || auth.user?.email || user.name;
+  const roleLabel = auth.role === "admin" ? "Administrador" : auth.role === "coach" ? "Entrenador" : "Padre / Tutor";
+  const initials = displayName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+
+  const handleSignOut = async () => {
+    await auth.signOut();
+    navigate({ to: "/auth" });
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -61,27 +70,27 @@ function ClubApp() {
             </div>
             <div className="min-w-0">
               <div className="truncate text-sm font-black uppercase tracking-wider">Club Hoops</div>
-              <div className="truncate text-[11px] text-muted-foreground">Gestión integral · prototipo</div>
+              <div className="truncate text-[11px] text-muted-foreground">Gestión integral</div>
             </div>
           </div>
           <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
-            <Select value={user.id} onValueChange={(id) => clubStore.set((s) => { s.currentUserId = id; })}>
-              <SelectTrigger className="flex-1 sm:w-[200px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    <span className="font-medium">{u.name}</span>
-                    <span className="ml-1 text-xs text-muted-foreground">· {u.role}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" onClick={() => { clubStore.reset(); setView("inicio"); }} title="Reiniciar datos de prueba">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5 sm:flex-initial">
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary text-xs font-bold">{initials || "U"}</div>
+              <div className="min-w-0 leading-tight">
+                <div className="truncate text-xs font-semibold">{displayName}</div>
+                <div className="truncate text-[10px] text-primary">{roleLabel}</div>
+              </div>
+            </div>
+            <Button variant="outline" size="icon" onClick={() => { clubStore.reset(); setView("inicio"); }} title="Reiniciar datos demo">
               <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={handleSignOut} title="Cerrar sesión">
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
+
 
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[220px_1fr]">
         {/* Sidebar */}
