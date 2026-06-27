@@ -41,7 +41,10 @@ export function Attendance() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between gap-2">
-            <span>Asistencia · {date}</span>
+            <span className="whitespace-pre-line leading-tight">
+              Asistencia{"\n"}
+              {date}
+            </span>
             <Select value={teamId} onValueChange={setTeamId}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
