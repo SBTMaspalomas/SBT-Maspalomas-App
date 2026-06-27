@@ -113,9 +113,9 @@ function ClubApp() {
           </nav>
           <div className="mt-3 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
             <div className="mb-1 font-semibold text-foreground">Sesión activa</div>
-            {user.name} <span className="text-primary">· {user.role}</span>
-            <div className="mt-2">Cambia de rol arriba para ver vistas diferenciadas.</div>
+            {displayName} <span className="text-primary">· {roleLabel}</span>
           </div>
+
         </aside>
 
         {/* Main */}
