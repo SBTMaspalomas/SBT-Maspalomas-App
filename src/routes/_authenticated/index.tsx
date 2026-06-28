@@ -13,7 +13,7 @@ import { Board } from "@/components/club/Board";
 import { RoleManager } from "@/components/club/RoleManager";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
