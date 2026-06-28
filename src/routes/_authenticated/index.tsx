@@ -130,6 +130,7 @@ function ClubApp() {
           {view === "pagos" && user.role === "parent" && <PaymentsParent />}
           {view === "asistencia" && user.role === "coach" && <Attendance />}
           {view === "chats" && <Chats />}
+          {view === "roles" && user.role === "admin" && <RoleManager />}
         </main>
       </div>
     </div>
