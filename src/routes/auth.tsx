@@ -161,7 +161,7 @@ function AuthPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="sp">Contraseña</Label>
-                  <Input id="sp" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <PasswordInput id="sp" value={password} onChange={setPassword} minLength={8} />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>Crear cuenta</Button>
               </form>
