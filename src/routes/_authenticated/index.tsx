@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent"] },
@@ -36,6 +36,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent"] },
   { id: "asistencia", label: "Asistencia", icon: ClipboardCheck, roles: ["coach"] },
   { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent"] },
+  { id: "roles", label: "Usuarios y roles", icon: Users, roles: ["admin"] },
 ];
 
 function ClubApp() {
