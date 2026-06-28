@@ -10,6 +10,7 @@ import { PaymentsAdmin, PaymentsParent } from "@/components/club/Payments";
 import { Attendance } from "@/components/club/Attendance";
 import { Chats } from "@/components/club/Chats";
 import { Board } from "@/components/club/Board";
+import { RoleManager } from "@/components/club/RoleManager";
 import type { Role } from "@/lib/clubStore";
 import {
   LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut,
