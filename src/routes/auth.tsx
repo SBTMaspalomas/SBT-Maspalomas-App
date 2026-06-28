@@ -139,7 +139,7 @@ function AuthPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lp">Contraseña</Label>
-                  <Input id="lp" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <PasswordInput id="lp" value={password} onChange={setPassword} />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>Entrar</Button>
                 <div className="flex items-center justify-between text-xs">
