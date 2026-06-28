@@ -10,9 +10,10 @@ import { PaymentsAdmin, PaymentsParent } from "@/components/club/Payments";
 import { Attendance } from "@/components/club/Attendance";
 import { Chats } from "@/components/club/Chats";
 import { Board } from "@/components/club/Board";
+import { RoleManager } from "@/components/club/RoleManager";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent"] },
@@ -35,6 +36,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent"] },
   { id: "asistencia", label: "Asistencia", icon: ClipboardCheck, roles: ["coach"] },
   { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent"] },
+  { id: "roles", label: "Usuarios y roles", icon: Users, roles: ["admin"] },
 ];
 
 function ClubApp() {
@@ -128,6 +130,7 @@ function ClubApp() {
           {view === "pagos" && user.role === "parent" && <PaymentsParent />}
           {view === "asistencia" && user.role === "coach" && <Attendance />}
           {view === "chats" && <Chats />}
+          {view === "roles" && user.role === "admin" && <RoleManager />}
         </main>
       </div>
     </div>
