@@ -50,7 +50,7 @@ function ClubApp() {
 
   const items = NAV.filter((n) => n.roles.includes(user.role));
   const displayName = auth.fullName || auth.user?.email || user.name;
-  const roleLabel = auth.role === "admin" ? "Administrador" : auth.role === "coach" ? "Entrenador" : "Padre / Tutor";
+  const roleLabel = auth.role === "admin" ? "Administrador" : auth.role === "coach" ? "Entrenador" : auth.role === "player" ? "Jugador/a" : "Padre / Tutor";
   const initials = displayName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
   const handleSignOut = async () => {
