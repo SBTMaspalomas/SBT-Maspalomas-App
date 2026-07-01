@@ -124,7 +124,9 @@ function ClubApp() {
 
         {/* Main */}
         <main className="space-y-4">
-          {view === "inicio" && <Home setView={setView} />}
+          {view === "inicio" && user.role === "player" && <PlayerView />}
+          {view === "inicio" && user.role !== "player" && <Home setView={setView} />}
+          {view === "mizona" && <PlayerView />}
           {view === "cartelera" && <Board />}
           {view === "registro" && <RegistrationFlow />}
           {view === "validacion" && user.role === "admin" && <ValidationConsole />}
