@@ -22,6 +22,7 @@ const DEMO_USER_BY_ROLE: Record<Role, string> = {
   admin: "u-admin",
   coach: "u-coach1",
   parent: "u-parent1",
+  player: "u-player1",
 };
 
 async function loadRoleAndProfile(userId: string) {
