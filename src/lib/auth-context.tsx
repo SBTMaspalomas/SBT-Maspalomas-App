@@ -25,13 +25,15 @@ const DEMO_USER_BY_ROLE: Record<Role, string> = {
 };
 
 async function loadRoleAndProfile(userId: string) {
-  const [{ data: roleRow }, { data: profile }] = await Promise.all([
+  const [{ data: roleRow }, { data: profile }, { data: teamRows }] = await Promise.all([
     supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+    supabase.from("coach_teams").select("team_id").eq("user_id", userId),
   ]);
   return {
     role: (roleRow?.role ?? "parent") as Role,
     fullName: profile?.full_name ?? null,
+    teamIds: (teamRows ?? []).map((r) => r.team_id),
   };
 }
 
