@@ -12,7 +12,8 @@ export function Attendance() {
   const players = useClub((s) => s.players);
   const myTeams = teams.filter((t) => user.teamIds?.includes(t.id));
   const [teamId, setTeamId] = useState(myTeams[0]?.id ?? "");
-  const [date] = useState(() => new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
   const teamPlayers = players.filter((p) => p.teamId === teamId);
 
   const toggle = (pid: string, key: "training" | "match") => {
