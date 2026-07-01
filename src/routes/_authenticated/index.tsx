@@ -11,9 +11,10 @@ import { Attendance } from "@/components/club/Attendance";
 import { Chats } from "@/components/club/Chats";
 import { Board } from "@/components/club/Board";
 import { RoleManager } from "@/components/club/RoleManager";
+import { PlayerView } from "@/components/club/PlayerView";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -26,16 +27,17 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
-  { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent"] },
+  { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player"] },
+  { id: "mizona", label: "Mi zona", icon: Trophy, roles: ["player"] },
   { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent"] },
   { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent"] },
   { id: "validacion", label: "Validación docs.", icon: ShieldCheck, roles: ["admin"] },
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent"] },
   { id: "asistencia", label: "Asistencia", icon: ClipboardCheck, roles: ["coach"] },
-  { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent"] },
+  { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player"] },
   { id: "roles", label: "Usuarios y roles", icon: Users, roles: ["admin"] },
 ];
 
@@ -48,7 +50,7 @@ function ClubApp() {
 
   const items = NAV.filter((n) => n.roles.includes(user.role));
   const displayName = auth.fullName || auth.user?.email || user.name;
-  const roleLabel = auth.role === "admin" ? "Administrador" : auth.role === "coach" ? "Entrenador" : "Padre / Tutor";
+  const roleLabel = auth.role === "admin" ? "Administrador" : auth.role === "coach" ? "Entrenador" : auth.role === "player" ? "Jugador/a" : "Padre / Tutor";
   const initials = displayName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
   const handleSignOut = async () => {
@@ -122,7 +124,9 @@ function ClubApp() {
 
         {/* Main */}
         <main className="space-y-4">
-          {view === "inicio" && <Home setView={setView} />}
+          {view === "inicio" && user.role === "player" && <PlayerView />}
+          {view === "inicio" && user.role !== "player" && <Home setView={setView} />}
+          {view === "mizona" && <PlayerView />}
           {view === "cartelera" && <Board />}
           {view === "registro" && <RegistrationFlow />}
           {view === "validacion" && user.role === "admin" && <ValidationConsole />}
