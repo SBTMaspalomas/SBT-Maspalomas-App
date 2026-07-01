@@ -54,12 +54,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
-      const { role: r, fullName: fn } = await loadRoleAndProfile(s.user.id);
+      const { role: r, fullName: fn, teamIds } = await loadRoleAndProfile(s.user.id);
       if (!active) return;
       setRole(r);
       setFullName(fn ?? s.user.email ?? null);
       // Bridge to demo store so existing UI/data keeps working
-      clubStore.set((st) => { st.currentUserId = DEMO_USER_BY_ROLE[r]; });
+      clubStore.set((st) => {
+        const demoId = DEMO_USER_BY_ROLE[r];
+        st.currentUserId = demoId;
+        if (r === "coach") {
+          const u = st.users.find((x) => x.id === demoId);
+          if (u) u.teamIds = teamIds;
+        }
+      });
       setLoading(false);
     };
 
