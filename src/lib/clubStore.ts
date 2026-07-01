@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export type Role = "admin" | "coach" | "parent";
+export type Role = "admin" | "coach" | "parent" | "player";
 
 export type DocStatus = "pending" | "approved" | "rejected";
 
