@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      club_events: {
+        Row: {
+          created_at: string
+          description: string | null
+          event_date: string
+          id: string
+          kind: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          event_date: string
+          id?: string
+          kind?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          event_date?: string
+          id?: string
+          kind?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       coach_teams: {
         Row: {
           created_at: string
@@ -34,6 +64,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      players: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          first_name: string
+          id: string
+          last_name: string
+          team_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          first_name: string
+          id?: string
+          last_name: string
+          team_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          team_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -58,6 +129,103 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      standings: {
+        Row: {
+          id: string
+          losses: number
+          opponent_name: string
+          points: number
+          position: number
+          team_id: string
+          updated_at: string
+          wins: number
+        }
+        Insert: {
+          id?: string
+          losses?: number
+          opponent_name: string
+          points?: number
+          position?: number
+          team_id: string
+          updated_at?: string
+          wins?: number
+        }
+        Update: {
+          id?: string
+          losses?: number
+          opponent_name?: string
+          points?: number
+          position?: number
+          team_id?: string
+          updated_at?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "standings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tutor_players: {
+        Row: {
+          created_at: string
+          id: string
+          player_id: string
+          relation: string
+          tutor_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          player_id: string
+          relation?: string
+          tutor_user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          player_id?: string
+          relation?: string
+          tutor_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutor_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -94,7 +262,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "coach" | "parent"
+      app_role: "admin" | "coach" | "parent" | "player"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -222,7 +390,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "coach", "parent"],
+      app_role: ["admin", "coach", "parent", "player"],
     },
   },
 } as const
