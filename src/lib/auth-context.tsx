@@ -25,13 +25,15 @@ const DEMO_USER_BY_ROLE: Record<Role, string> = {
 };
 
 async function loadRoleAndProfile(userId: string) {
-  const [{ data: roleRow }, { data: profile }] = await Promise.all([
+  const [{ data: roleRow }, { data: profile }, { data: teamRows }] = await Promise.all([
     supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+    supabase.from("coach_teams").select("team_id").eq("user_id", userId),
   ]);
   return {
     role: (roleRow?.role ?? "parent") as Role,
     fullName: profile?.full_name ?? null,
+    teamIds: (teamRows ?? []).map((r) => r.team_id),
   };
 }
 
@@ -52,12 +54,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
-      const { role: r, fullName: fn } = await loadRoleAndProfile(s.user.id);
+      const { role: r, fullName: fn, teamIds } = await loadRoleAndProfile(s.user.id);
       if (!active) return;
       setRole(r);
       setFullName(fn ?? s.user.email ?? null);
       // Bridge to demo store so existing UI/data keeps working
-      clubStore.set((st) => { st.currentUserId = DEMO_USER_BY_ROLE[r]; });
+      clubStore.set((st) => {
+        const demoId = DEMO_USER_BY_ROLE[r];
+        st.currentUserId = demoId;
+        if (r === "coach") {
+          const u = st.users.find((x) => x.id === demoId);
+          if (u) u.teamIds = teamIds;
+        }
+      });
       setLoading(false);
     };
 

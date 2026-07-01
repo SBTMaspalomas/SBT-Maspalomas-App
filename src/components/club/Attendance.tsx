@@ -3,6 +3,7 @@ import { clubStore, useClub, currentUser } from "@/lib/clubStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 
 export function Attendance() {
@@ -11,7 +12,8 @@ export function Attendance() {
   const players = useClub((s) => s.players);
   const myTeams = teams.filter((t) => user.teamIds?.includes(t.id));
   const [teamId, setTeamId] = useState(myTeams[0]?.id ?? "");
-  const [date] = useState(() => new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
   const teamPlayers = players.filter((p) => p.teamId === teamId);
 
   const toggle = (pid: string, key: "training" | "match") => {
@@ -40,11 +42,8 @@ export function Attendance() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between gap-2">
-            <span className="whitespace-pre-line leading-tight">
-              Asistencia{"\n"}
-              {date}
-            </span>
+          <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+            <span className="leading-tight">Asistencia</span>
             <Select value={teamId} onValueChange={setTeamId}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -52,6 +51,30 @@ export function Attendance() {
               </SelectContent>
             </Select>
           </CardTitle>
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Fecha</label>
+            <Input
+              type="date"
+              value={date}
+              max={today}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-auto"
+            />
+            {date !== today && (
+              <button
+                type="button"
+                onClick={() => setDate(today)}
+                className="text-xs text-primary underline underline-offset-2"
+              >
+                Hoy
+              </button>
+            )}
+            {date !== today && (
+              <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-bold uppercase text-warning">
+                Editando día anterior
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-border pb-2 text-xs font-semibold uppercase text-muted-foreground">
