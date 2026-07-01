@@ -100,6 +100,7 @@ const seed = (): ClubState => {
     { id: "u-coach2", name: "Jorge Ruiz", email: "jorge@club.es", role: "coach", teamIds: ["t2"] },
     { id: "u-parent1", name: "Ana García", email: "ana@mail.es", role: "parent", playerId: "p1" },
     { id: "u-parent2", name: "Luis Pérez", email: "luis@mail.es", role: "parent", playerId: "p6" },
+    { id: "u-player1", name: "Lucía Martín (Jugadora)", email: "lucia@mail.es", role: "player", playerId: "p1" },
   ];
   const teams: Team[] = [
     { id: "t1", name: "Mini A", category: "Mini (10-11 años)", coachId: "u-coach1" },
