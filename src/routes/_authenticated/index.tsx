@@ -182,9 +182,10 @@ function Home({ setView }: { setView: (v: View) => void }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <QuickAction onClick={() => setView("cartelera")} title="Próximos partidos" desc={`${matches.length} programados`} />
         <QuickAction onClick={() => setView("chats")} title="Chats del club" desc="Equipo, padres y difusión" />
-        {user.role === "admin" && <QuickAction onClick={() => setView("validacion")} title="Validar documentos" desc={`${stats.pending} pendientes`} />}
-        {user.role === "coach" && <QuickAction onClick={() => setView("asistencia")} title="Tomar asistencia" desc="Entreno y partido" />}
-        {user.role === "parent" && <QuickAction onClick={() => setView("pagos")} title="Mis cuotas" desc="Estado y justificantes" />}
+        {role === "admin" && <QuickAction onClick={() => setView("validacion")} title="Validar documentos" desc={`${stats.pending} pendientes`} />}
+        {role === "coach" && <QuickAction onClick={() => setView("asistencia")} title="Tomar asistencia" desc="Entreno y partido" />}
+        {role === "parent" && <QuickAction onClick={() => setView("pagos")} title="Mis cuotas" desc="Estado y justificantes" />}
+
       </div>
     </div>
   );
