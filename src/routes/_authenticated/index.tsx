@@ -160,15 +160,16 @@ function Home({ setView }: { setView: (v: View) => void }) {
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-elevated p-5">
         <div className="text-xs uppercase tracking-widest text-primary">Bienvenido</div>
-        <h1 className="mt-1 text-2xl font-black">{user.name}</h1>
+        <h1 className="mt-1 text-2xl font-black">{displayName}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {user.role === "admin" && "Tienes control total: finanzas, validación documental, mensajería y cartelera."}
-          {user.role === "coach" && "Gestiona la asistencia de tus equipos y comunica con jugadores y padres."}
-          {user.role === "parent" && "Consulta tus pagos, próximos partidos y chats del equipo."}
+          {role === "admin" && "Tienes control total: finanzas, validación documental, mensajería y cartelera."}
+          {role === "coach" && "Gestiona la asistencia de tus equipos y comunica con jugadores y padres."}
+          {role === "parent" && "Consulta tus pagos, próximos partidos y chats del equipo."}
+          {role === "player" && "Consulta tu jornada, calendario, clasificación y noticias del club."}
         </p>
       </div>
 
-      {user.role === "admin" && (
+      {role === "admin" && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Jugadores" value={players.length} />
           <Stat label="Aprobados" value={stats.approved} tone="success" />
@@ -176,6 +177,7 @@ function Home({ setView }: { setView: (v: View) => void }) {
           <Stat label="Pagos pendientes" value={stats.paymentsDue} tone="destructive" />
         </div>
       )}
+
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <QuickAction onClick={() => setView("cartelera")} title="Próximos partidos" desc={`${matches.length} programados`} />
