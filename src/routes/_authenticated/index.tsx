@@ -142,15 +142,19 @@ function ClubApp() {
 }
 
 function Home({ setView }: { setView: (v: View) => void }) {
+  const auth = useAuth();
   const user = useClub(currentUser);
   const players = useClub((s) => s.players);
   const matches = useClub((s) => s.matches);
+  const displayName = auth.fullName || auth.user?.email || user.name;
+  const role = auth.role ?? user.role;
   const stats = {
     pending: players.filter((p) => p.docStatus === "pending").length,
     approved: players.filter((p) => p.docStatus === "approved").length,
     rejected: players.filter((p) => p.docStatus === "rejected").length,
     paymentsDue: players.reduce((n, p) => n + p.payments.filter((x) => !x.paid).length, 0),
   };
+
 
   return (
     <div className="space-y-4">
