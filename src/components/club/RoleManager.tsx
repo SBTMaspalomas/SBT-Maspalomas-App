@@ -3,34 +3,36 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Shield, Users, Search, RefreshCw } from "lucide-react";
+import { Shield, Users, Search, RefreshCw, Baby } from "lucide-react";
 
-type Role = "admin" | "coach" | "parent" | "player";
+type Role = "admin" | "coach" | "family";
 
 interface TeamRow { id: string; name: string; category: string; }
-interface PlayerRow { id: string; first_name: string; last_name: string; team_id: string | null; user_id: string | null; }
+interface PlayerRow { id: string; full_name: string; birth_date: string | null; team_id: string | null; family_id: string | null; }
+interface FamilyRow { id: string; head_email: string | null; head_profile_id: string | null; reference_code: string | null; }
 
 interface Row {
   id: string;
   email: string;
   full_name: string | null;
   role: Role;
-  teamIds: string[]; // coach
-  linkedPlayerIds: string[]; // parent (tutor_players)
-  ownPlayerId: string | null; // player (players.user_id)
+  teamIds: string[];       // coach
+  familyId: string | null; // family (head_profile_id)
+  referenceCode: string | null;
+  childCount: number;
 }
 
 const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrador",
   coach: "Entrenador",
-  parent: "Padre / Tutor",
-  player: "Jugador/a",
+  family: "Familia",
 };
 
 export function RoleManager() {
   const [rows, setRows] = useState<Row[]>([]);
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [families, setFamilies] = useState<FamilyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -41,24 +43,24 @@ export function RoleManager() {
       { data: profiles, error: pErr },
       { data: roles, error: rErr },
       { data: ct, error: ctErr },
-      { data: tp, error: tpErr },
       { data: teamsData, error: tErr },
       { data: playersData, error: plErr },
+      { data: familiesData, error: fErr },
     ] = await Promise.all([
       supabase.from("profiles").select("id, email, full_name").order("created_at", { ascending: false }),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("coach_teams").select("user_id, team_id"),
-      supabase.from("tutor_players").select("tutor_user_id, player_id"),
       supabase.from("teams").select("id, name, category").order("name"),
-      supabase.from("players").select("id, first_name, last_name, team_id, user_id").order("last_name"),
+      supabase.from("players").select("id, full_name, birth_date, team_id, family_id").order("birth_date"),
+      supabase.from("families_meta").select("id, head_email, head_profile_id, reference_code"),
     ]);
-    if (pErr || rErr || ctErr || tpErr || tErr || plErr) {
+    if (pErr || rErr || ctErr || tErr || plErr || fErr) {
       toast.error("No se pudieron cargar los datos");
-      setLoading(false);
-      return;
+      setLoading(false); return;
     }
-    setTeams(teamsData ?? []);
-    setPlayers(playersData ?? []);
+    setTeams((teamsData ?? []) as TeamRow[]);
+    setPlayers((playersData ?? []) as PlayerRow[]);
+    setFamilies((familiesData ?? []) as FamilyRow[]);
 
     const roleMap = new Map<string, Role>();
     (roles ?? []).forEach((r) => roleMap.set(r.user_id, r.role as Role));
@@ -66,23 +68,28 @@ export function RoleManager() {
     (ct ?? []).forEach((r) => {
       const arr = teamMap.get(r.user_id) ?? []; arr.push(r.team_id); teamMap.set(r.user_id, arr);
     });
-    const tutorMap = new Map<string, string[]>();
-    (tp ?? []).forEach((r) => {
-      const arr = tutorMap.get(r.tutor_user_id) ?? []; arr.push(r.player_id); tutorMap.set(r.tutor_user_id, arr);
+    const famByHead = new Map<string, FamilyRow>();
+    (familiesData ?? []).forEach((f) => { if (f.head_profile_id) famByHead.set(f.head_profile_id, f as FamilyRow); });
+    const childCountByFam = new Map<string, number>();
+    (playersData ?? []).forEach((p) => {
+      if (!p.family_id) return;
+      childCountByFam.set(p.family_id, (childCountByFam.get(p.family_id) ?? 0) + 1);
     });
-    const ownPlayerMap = new Map<string, string>();
-    (playersData ?? []).forEach((p) => { if (p.user_id) ownPlayerMap.set(p.user_id, p.id); });
 
     setRows(
-      (profiles ?? []).map((p) => ({
-        id: p.id,
-        email: p.email,
-        full_name: p.full_name,
-        role: roleMap.get(p.id) ?? "parent",
-        teamIds: teamMap.get(p.id) ?? [],
-        linkedPlayerIds: tutorMap.get(p.id) ?? [],
-        ownPlayerId: ownPlayerMap.get(p.id) ?? null,
-      })),
+      (profiles ?? []).map((p) => {
+        const fam = famByHead.get(p.id) ?? null;
+        return {
+          id: p.id,
+          email: p.email,
+          full_name: p.full_name,
+          role: (roleMap.get(p.id) ?? "family") as Role,
+          teamIds: teamMap.get(p.id) ?? [],
+          familyId: fam?.id ?? null,
+          referenceCode: fam?.reference_code ?? null,
+          childCount: fam ? (childCountByFam.get(fam.id) ?? 0) : 0,
+        };
+      }),
     );
     setLoading(false);
   }, []);
@@ -92,14 +99,11 @@ export function RoleManager() {
   const changeRole = async (userId: string, newRole: Role) => {
     setSavingId(userId);
     await supabase.from("user_roles").delete().eq("user_id", userId);
-    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole });
+    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" });
     if (insErr) { toast.error("Error al asignar rol"); setSavingId(null); return; }
     if (newRole !== "coach") await supabase.from("coach_teams").delete().eq("user_id", userId);
-    if (newRole !== "parent") await supabase.from("tutor_players").delete().eq("tutor_user_id", userId);
-    if (newRole !== "player") await supabase.from("players").update({ user_id: null }).eq("user_id", userId);
     toast.success(`Rol actualizado a ${ROLE_LABEL[newRole]}`);
-    setSavingId(null);
-    load();
+    setSavingId(null); load();
   };
 
   const toggleTeam = async (userId: string, teamId: string, assigned: boolean) => {
@@ -109,21 +113,35 @@ export function RoleManager() {
     setSavingId(null); load();
   };
 
-  const toggleLinkedPlayer = async (userId: string, playerId: string, linked: boolean) => {
-    setSavingId(userId);
-    if (linked) await supabase.from("tutor_players").delete().eq("tutor_user_id", userId).eq("player_id", playerId);
-    else await supabase.from("tutor_players").insert({ tutor_user_id: userId, player_id: playerId });
-    setSavingId(null); load();
+  const ensureFamily = async (userId: string, email: string): Promise<string | null> => {
+    // Try to find an existing family for this user (or one that matches their email)
+    const existing = families.find((f) => f.head_profile_id === userId)
+      ?? families.find((f) => f.head_email === email && !f.head_profile_id);
+    if (existing) {
+      if (!existing.head_profile_id) {
+        await supabase.from("families_meta").update({ head_profile_id: userId }).eq("id", existing.id);
+      }
+      return existing.id;
+    }
+    const { data: created, error } = await supabase
+      .from("families_meta")
+      .insert({ head_profile_id: userId, head_email: email })
+      .select("id")
+      .single();
+    if (error || !created) { toast.error("No se pudo crear la familia"); return null; }
+    return created.id;
   };
 
-  const linkOwnPlayer = async (userId: string, playerId: string) => {
+  const toggleChild = async (userId: string, email: string, playerId: string, currentFamilyId: string | null) => {
     setSavingId(userId);
-    // Detach anyone else previously bound + detach this user from other players
-    await supabase.from("players").update({ user_id: null }).eq("user_id", userId);
-    if (playerId) {
-      const { error } = await supabase.from("players").update({ user_id: userId }).eq("id", playerId);
-      if (error) toast.error("No se pudo enlazar (¿ya está asignado?)");
-    }
+    const famId = await ensureFamily(userId, email);
+    if (!famId) { setSavingId(null); return; }
+    const isMine = currentFamilyId === famId;
+    const { error } = await supabase
+      .from("players")
+      .update({ family_id: isMine ? null : famId })
+      .eq("id", playerId);
+    if (error) toast.error("No se pudo actualizar la vinculación");
     setSavingId(null); load();
   };
 
@@ -171,11 +189,10 @@ export function RoleManager() {
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                     u.role === "admin" ? "bg-primary/15 text-primary" :
                     u.role === "coach" ? "bg-warning/15 text-warning" :
-                    u.role === "player" ? "bg-success/15 text-success" :
                     "bg-surface-elevated text-muted-foreground"
                   }`}>{ROLE_LABEL[u.role]}</span>
                   <div className="flex w-full flex-wrap gap-1 sm:w-auto">
-                    {(["parent", "player", "coach", "admin"] as Role[]).map((r) => (
+                    {(["family", "coach", "admin"] as Role[]).map((r) => (
                       <Button
                         key={r} size="sm"
                         variant={u.role === r ? "default" : "outline"}
@@ -183,7 +200,7 @@ export function RoleManager() {
                         onClick={() => changeRole(u.id, r)}
                         className="flex-1 text-xs sm:flex-initial"
                       >
-                        {r === "parent" ? "Padre" : r === "player" ? "Jugador" : r === "coach" ? "Entrenador" : "Admin"}
+                        {ROLE_LABEL[r]}
                       </Button>
                     ))}
                   </div>
@@ -210,50 +227,47 @@ export function RoleManager() {
                   </div>
                 )}
 
-                {u.role === "parent" && (
+                {u.role === "family" && (
                   <div className="rounded-lg border border-border bg-background p-3">
-                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Hijos/as vinculados ({u.linkedPlayerIds.length})</div>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Hijos/as vinculados ({u.childCount})
+                      </div>
+                      {u.referenceCode && (
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
+                          {u.referenceCode}
+                        </span>
+                      )}
+                    </div>
                     {players.length === 0 ? (
                       <p className="text-xs text-muted-foreground">No hay jugadores en la base de datos.</p>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {players.map((p) => {
-                          const linked = u.linkedPlayerIds.includes(p.id);
-                          const team = teams.find((t) => t.id === p.team_id);
+                          const mine = u.familyId && p.family_id === u.familyId;
+                          const takenByOther = p.family_id && !mine;
                           return (
-                            <button key={p.id} onClick={() => toggleLinkedPlayer(u.id, p.id, linked)} disabled={savingId === u.id}
-                              className={`rounded-full border px-3 py-1 text-xs transition-colors ${linked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface text-foreground hover:border-primary"}`}>
-                              {linked ? "✓ " : "+ "}{p.first_name} {p.last_name}{team && ` · ${team.name}`}
+                            <button
+                              key={p.id}
+                              onClick={() => toggleChild(u.id, u.email, p.id, p.family_id)}
+                              disabled={savingId === u.id || !!takenByOther}
+                              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                                mine ? "border-primary bg-primary text-primary-foreground" :
+                                takenByOther ? "border-border bg-surface/50 text-muted-foreground opacity-60" :
+                                "border-border bg-surface text-foreground hover:border-primary"
+                              }`}
+                              title={takenByOther ? "Ya vinculado a otra familia" : ""}
+                            >
+                              <Baby className="mr-1 inline h-3 w-3" />
+                              {p.full_name}{p.team_id && ` · ${p.team_id}`}
                             </button>
                           );
                         })}
                       </div>
                     )}
-                    <p className="mt-2 text-[11px] text-muted-foreground">Un tutor puede tener varios hijos y un jugador varios tutores.</p>
-                  </div>
-                )}
-
-                {u.role === "player" && (
-                  <div className="rounded-lg border border-border bg-background p-3">
-                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Ficha del jugador</div>
-                    <select
-                      value={u.ownPlayerId ?? ""}
-                      onChange={(e) => linkOwnPlayer(u.id, e.target.value)}
-                      disabled={savingId === u.id}
-                      className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-                    >
-                      <option value="">— Sin ficha vinculada —</option>
-                      {players.map((p) => {
-                        const team = teams.find((t) => t.id === p.team_id);
-                        const takenByOther = p.user_id && p.user_id !== u.id;
-                        return (
-                          <option key={p.id} value={p.id} disabled={!!takenByOther}>
-                            {p.first_name} {p.last_name}{team && ` · ${team.name}`}{takenByOther ? " (ya asignada)" : ""}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <p className="mt-2 text-[11px] text-muted-foreground">El jugador verá su equipo, calendario y clasificación al iniciar sesión.</p>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Al vincular un hijo se crea automáticamente la ficha de familia (código: <span className="font-mono">Nombre.Inicial-AA</span>).
+                    </p>
                   </div>
                 )}
               </li>
