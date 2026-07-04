@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useClub } from "@/lib/clubStore";
@@ -6,79 +6,67 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Calendar, Trophy, Sparkles, Newspaper, Image as ImageIcon, BarChart3, MapPin, Clock } from "lucide-react";
 
-interface PlayerRow {
-  id: string;
-  first_name: string;
-  last_name: string;
-  team_id: string | null;
-}
-interface TeamRow { id: string; name: string; category: string; }
-interface StandingRow { id: string; opponent_name: string; position: number; wins: number; losses: number; points: number; }
 interface EventRow { id: string; title: string; description: string | null; event_date: string; kind: string; }
+interface StandingRow { id: string; opponent_name: string; position: number; wins: number; losses: number; points: number; }
 
-export function PlayerView() {
+interface Props {
+  childId?: string; // when family selected a specific child
+}
+
+export function PlayerView({ childId }: Props = {}) {
   const auth = useAuth();
   const matches = useClub((s) => s.matches);
   const announcements = useClub((s) => s.announcements);
   const [loading, setLoading] = useState(true);
-  const [player, setPlayer] = useState<PlayerRow | null>(null);
-  const [team, setTeam] = useState<TeamRow | null>(null);
   const [standings, setStandings] = useState<StandingRow[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
 
+  const child = useMemo(() => {
+    if (!childId || !auth.family) return null;
+    return auth.family.children.find((c) => c.id === childId) ?? null;
+  }, [childId, auth.family]);
+
   useEffect(() => {
     const load = async () => {
-      if (!auth.user) return;
       setLoading(true);
-      const { data: pRows } = await supabase
-        .from("players")
-        .select("id, first_name, last_name, team_id")
-        .eq("user_id", auth.user.id)
-        .limit(1);
-      const p = (pRows ?? [])[0] ?? null;
-      setPlayer(p);
-      if (p?.team_id) {
-        const [{ data: t }, { data: s }] = await Promise.all([
-          supabase.from("teams").select("id, name, category").eq("id", p.team_id).maybeSingle(),
-          supabase.from("standings").select("id, opponent_name, position, wins, losses, points")
-            .eq("team_id", p.team_id).order("position", { ascending: true }),
-        ]);
-        setTeam(t);
-        setStandings(s ?? []);
-      }
-      const { data: ev } = await supabase.from("club_events")
-        .select("id, title, description, event_date, kind").order("event_date", { ascending: true });
-      setEvents(ev ?? []);
+      const teamText = child?.team_id ?? null;
+      const [{ data: s }, { data: ev }] = await Promise.all([
+        teamText
+          ? supabase.from("standings").select("id, opponent_name, position, wins, losses, points").order("position", { ascending: true })
+          : Promise.resolve({ data: [] as StandingRow[] }),
+        supabase.from("club_events").select("id, title, description, event_date, kind").order("event_date", { ascending: true }),
+      ]);
+      setStandings((s ?? []) as StandingRow[]);
+      setEvents((ev ?? []) as EventRow[]);
       setLoading(false);
     };
     load();
-  }, [auth.user]);
+  }, [child]);
 
-  // Filter demo matches by team if we can loosely map by name (Mini A / Cadete B share ids "t1"/"t2" in demo)
-  const teamMatches = team
-    ? matches.filter((m) => {
-        if (team.name === "Mini A") return m.teamId === "t1";
-        if (team.name === "Cadete B") return m.teamId === "t2";
-        return true;
-      })
-    : matches;
+  // Filter demo matches: match on team_id text loosely against team name in demo store
+  const teamMatches = useMemo(() => {
+    if (!child?.team_id) return matches;
+    const target = child.team_id.toLowerCase();
+    return matches.filter((m) => {
+      if (target.includes("mini a")) return m.teamId === "t1";
+      if (target.includes("cadete")) return m.teamId === "t2";
+      return true;
+    });
+  }, [matches, child]);
 
-  const next = [...teamMatches].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
-  const week = [...teamMatches].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...teamMatches].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const next = sorted[0];
+
+  const displayName = child?.full_name ?? auth.fullName ?? "Jugador/a";
+  const teamLabel = child?.team_id ?? "Sin equipo asignado";
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-elevated p-5">
-        <div className="text-xs uppercase tracking-widest text-primary">Mi zona</div>
-        <h1 className="mt-1 text-2xl font-black">
-          {player ? `${player.first_name} ${player.last_name}` : (auth.fullName || "Jugador/a")}
-        </h1>
+        <div className="text-xs uppercase tracking-widest text-primary">Perfil jugador/a</div>
+        <h1 className="mt-1 text-2xl font-black">{displayName}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {loading
-            ? "Cargando tu equipo…"
-            : team
-              ? <>Equipo: <span className="font-semibold text-foreground">{team.name}</span> · {team.category}</>
-              : "Aún no estás vinculado a un jugador. Pide al club que enlace tu cuenta."}
+          {loading ? "Cargando…" : <>Equipo: <span className="font-semibold text-foreground">{teamLabel}</span></>}
         </p>
       </div>
 
@@ -102,7 +90,7 @@ export function PlayerView() {
               ) : (
                 <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
                   <div className="text-xs uppercase tracking-wide text-primary">Próxima jornada</div>
-                  <div className="mt-1 text-lg font-black">{team?.name ?? "Tu equipo"} <span className="text-muted-foreground text-sm">vs</span> {next.opponent}</div>
+                  <div className="mt-1 text-lg font-black">{teamLabel} <span className="text-muted-foreground text-sm">vs</span> {next.opponent}</div>
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" /> {new Date(next.date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "short" })} · {next.time}
                   </div>
@@ -123,12 +111,12 @@ export function PlayerView() {
             </TabsContent>
 
             <TabsContent value="calendario" className="mt-4 space-y-2">
-              {week.length === 0 && <p className="text-sm text-muted-foreground">Sin partidos en el calendario.</p>}
-              {week.map((m) => (
+              {sorted.length === 0 && <p className="text-sm text-muted-foreground">Sin partidos en el calendario.</p>}
+              {sorted.map((m) => (
                 <div key={m.id} className="rounded-lg border border-border bg-surface p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="truncate font-semibold">{team?.name ?? "Tu equipo"} vs {m.opponent}</div>
+                      <div className="truncate font-semibold">{teamLabel} vs {m.opponent}</div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
                         {new Date(m.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · {m.time}
                       </div>
@@ -157,18 +145,15 @@ export function PlayerView() {
                       </tr>
                     </thead>
                     <tbody>
-                      {standings.map((s) => {
-                        const isMine = team && s.opponent_name === team.name;
-                        return (
-                          <tr key={s.id} className={`border-t border-border ${isMine ? "bg-primary/10 font-semibold" : ""}`}>
-                            <td className="p-2">{s.position}</td>
-                            <td className="p-2">{s.opponent_name}{isMine && " ⭐"}</td>
-                            <td className="p-2 text-center">{s.wins}</td>
-                            <td className="p-2 text-center">{s.losses}</td>
-                            <td className="p-2 text-center text-primary">{s.points}</td>
-                          </tr>
-                        );
-                      })}
+                      {standings.map((s) => (
+                        <tr key={s.id} className="border-t border-border">
+                          <td className="p-2">{s.position}</td>
+                          <td className="p-2">{s.opponent_name}</td>
+                          <td className="p-2 text-center">{s.wins}</td>
+                          <td className="p-2 text-center">{s.losses}</td>
+                          <td className="p-2 text-center text-primary">{s.points}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
