@@ -12,9 +12,10 @@ import { Chats } from "@/components/club/Chats";
 import { Board } from "@/components/club/Board";
 import { RoleManager } from "@/components/club/RoleManager";
 import { PlayerView } from "@/components/club/PlayerView";
+import { FamilySelector } from "@/components/club/FamilySelector";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -30,14 +31,14 @@ export const Route = createFileRoute("/_authenticated/")({
 type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
-  { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player"] },
+  { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family"] },
   { id: "mizona", label: "Mi zona", icon: Trophy, roles: ["player"] },
-  { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent"] },
-  { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent"] },
+  { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent", "family"] },
+  { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
   { id: "validacion", label: "Validación docs.", icon: ShieldCheck, roles: ["admin"] },
-  { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent"] },
+  { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family"] },
   { id: "asistencia", label: "Asistencia", icon: ClipboardCheck, roles: ["coach"] },
-  { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player"] },
+  { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player", "family"] },
   { id: "roles", label: "Usuarios y roles", icon: Users, roles: ["admin"] },
 ];
 
@@ -48,21 +49,47 @@ function ClubApp() {
   const [view, setView] = useState<View>("inicio");
   const [navOpen, setNavOpen] = useState(false);
 
-  const items = NAV.filter((n) => n.roles.includes(user.role));
-  const displayName = auth.fullName || auth.user?.email || user.name;
-  const roleLabel = auth.role === "admin" ? "Administrador" : auth.role === "coach" ? "Entrenador" : auth.role === "player" ? "Jugador/a" : "Padre / Tutor";
-  const initials = displayName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
-
   const handleSignOut = async () => {
     await auth.signOut();
     navigate({ to: "/auth" });
   };
 
+  // Family role: show Netflix-style profile selector until a profile is chosen
+  if (auth.role === "family" && !auth.activeProfile) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <Toaster theme="dark" position="top-center" />
+        <FamilySelector />
+      </div>
+    );
+  }
+
+  // Family + child profile → render PlayerView for that child
+  const isChildProfile = auth.role === "family" && auth.activeProfile?.kind === "child";
+  const childId = isChildProfile && auth.activeProfile?.kind === "child" ? auth.activeProfile.childId : undefined;
+  const activeChild = childId && auth.family
+    ? auth.family.children.find((c) => c.id === childId) ?? null
+    : null;
+
+  // Determine effective role for menu filtering (child profile behaves like 'player')
+  const effectiveRole: Role = isChildProfile ? "player" : (auth.role ?? user.role);
+  const items = NAV.filter((n) => n.roles.includes(effectiveRole));
+
+  const displayName = isChildProfile
+    ? (activeChild?.full_name ?? "Jugador/a")
+    : (auth.fullName || auth.user?.email || user.name);
+  const roleLabel = isChildProfile
+    ? "Perfil jugador/a"
+    : auth.role === "admin" ? "Administrador"
+    : auth.role === "coach" ? "Entrenador"
+    : auth.role === "family" ? "Adultos Responsables"
+    : "Usuario";
+  const initials = displayName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster theme="dark" position="top-center" />
 
-      {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
           <button className="shrink-0 lg:hidden" onClick={() => setNavOpen((v) => !v)} aria-label="menu">
@@ -85,6 +112,11 @@ function ClubApp() {
                 <div className="truncate text-[10px] text-primary">{roleLabel}</div>
               </div>
             </div>
+            {auth.role === "family" && (
+              <Button variant="outline" size="icon" onClick={() => { auth.clearProfile(); setView("inicio"); }} title="Cambiar de perfil">
+                <ArrowLeftRight className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="outline" size="icon" onClick={() => { clubStore.reset(); setView("inicio"); }} title="Reiniciar datos demo">
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -94,7 +126,6 @@ function ClubApp() {
           </div>
         </div>
       </header>
-
 
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[220px_1fr]">
         {/* Sidebar */}
@@ -118,43 +149,49 @@ function ClubApp() {
           <div className="mt-3 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
             <div className="mb-1 font-semibold text-foreground">Sesión activa</div>
             {displayName} <span className="text-primary">· {roleLabel}</span>
+            {auth.family?.reference_code && (
+              <div className="mt-1">Familia: <span className="font-mono font-semibold text-foreground">{auth.family.reference_code}</span></div>
+            )}
           </div>
-
         </aside>
 
         {/* Main */}
         <main className="space-y-4">
-          {view === "inicio" && user.role === "player" && <PlayerView />}
-          {view === "inicio" && user.role !== "player" && <Home setView={setView} />}
-          {view === "mizona" && <PlayerView />}
-          {view === "cartelera" && <Board />}
-          {view === "registro" && <RegistrationFlow />}
-          {view === "validacion" && user.role === "admin" && <ValidationConsole />}
-          {view === "pagos" && user.role === "admin" && <PaymentsAdmin />}
-          {view === "pagos" && user.role === "parent" && <PaymentsParent />}
-          {view === "asistencia" && user.role === "coach" && <Attendance />}
-          {view === "chats" && <Chats />}
-          {view === "roles" && user.role === "admin" && <RoleManager />}
+          {isChildProfile ? (
+            <PlayerView childId={childId} />
+          ) : (
+            <>
+              {view === "inicio" && <Home setView={setView} effectiveRole={effectiveRole} />}
+              {view === "mizona" && <PlayerView />}
+              {view === "cartelera" && <Board />}
+              {view === "registro" && <RegistrationFlow />}
+              {view === "validacion" && auth.role === "admin" && <ValidationConsole />}
+              {view === "pagos" && auth.role === "admin" && <PaymentsAdmin />}
+              {view === "pagos" && (auth.role === "parent" || auth.role === "family") && <PaymentsParent />}
+              {view === "asistencia" && auth.role === "coach" && <Attendance />}
+              {view === "chats" && <Chats />}
+              {view === "roles" && auth.role === "admin" && <RoleManager />}
+            </>
+          )}
         </main>
       </div>
     </div>
   );
 }
 
-function Home({ setView }: { setView: (v: View) => void }) {
+function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiveRole: Role }) {
   const auth = useAuth();
   const user = useClub(currentUser);
   const players = useClub((s) => s.players);
   const matches = useClub((s) => s.matches);
   const displayName = auth.fullName || auth.user?.email || user.name;
-  const role = auth.role ?? user.role;
+  const role = effectiveRole;
   const stats = {
     pending: players.filter((p) => p.docStatus === "pending").length,
     approved: players.filter((p) => p.docStatus === "approved").length,
     rejected: players.filter((p) => p.docStatus === "rejected").length,
     paymentsDue: players.reduce((n, p) => n + p.payments.filter((x) => !x.paid).length, 0),
   };
-
 
   return (
     <div className="space-y-4">
@@ -164,9 +201,15 @@ function Home({ setView }: { setView: (v: View) => void }) {
         <p className="mt-1 text-sm text-muted-foreground">
           {role === "admin" && "Tienes control total: finanzas, validación documental, mensajería y cartelera."}
           {role === "coach" && "Gestiona la asistencia de tus equipos y comunica con jugadores y padres."}
-          {role === "parent" && "Consulta tus pagos, próximos partidos y chats del equipo."}
+          {(role === "parent" || role === "family") && "Consulta tus pagos, próximos partidos y chats del equipo."}
           {role === "player" && "Consulta tu jornada, calendario, clasificación y noticias del club."}
         </p>
+        {auth.family && (
+          <div className="mt-2 text-xs text-muted-foreground">
+            Familia registrada: <span className="font-mono font-semibold text-foreground">{auth.family.reference_code ?? "—"}</span>
+            {" · "}{auth.family.children.length} hijo/a{auth.family.children.length === 1 ? "" : "s"}
+          </div>
+        )}
       </div>
 
       {role === "admin" && (
@@ -178,14 +221,12 @@ function Home({ setView }: { setView: (v: View) => void }) {
         </div>
       )}
 
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <QuickAction onClick={() => setView("cartelera")} title="Próximos partidos" desc={`${matches.length} programados`} />
         <QuickAction onClick={() => setView("chats")} title="Chats del club" desc="Equipo, padres y difusión" />
         {role === "admin" && <QuickAction onClick={() => setView("validacion")} title="Validar documentos" desc={`${stats.pending} pendientes`} />}
         {role === "coach" && <QuickAction onClick={() => setView("asistencia")} title="Tomar asistencia" desc="Entreno y partido" />}
-        {role === "parent" && <QuickAction onClick={() => setView("pagos")} title="Mis cuotas" desc="Estado y justificantes" />}
-
+        {(role === "parent" || role === "family") && <QuickAction onClick={() => setView("pagos")} title="Mis cuotas" desc="Estado y justificantes" />}
       </div>
     </div>
   );
