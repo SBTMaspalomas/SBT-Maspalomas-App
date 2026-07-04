@@ -65,49 +65,75 @@ export type Database = {
         }
         Relationships: []
       }
+      families_meta: {
+        Row: {
+          created_at: string
+          head_email: string | null
+          head_profile_id: string | null
+          id: string
+          reference_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          head_email?: string | null
+          head_profile_id?: string | null
+          id?: string
+          reference_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          head_email?: string | null
+          head_profile_id?: string | null
+          id?: string
+          reference_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "families_meta_head_profile_id_fkey"
+            columns: ["head_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           birth_date: string | null
           created_at: string
-          first_name: string
+          family_id: string | null
+          full_name: string
           id: string
-          id_card_number: string | null
-          last_name: string
-          photo_url: string | null
           team_id: string | null
           updated_at: string
-          user_id: string | null
         }
         Insert: {
           birth_date?: string | null
           created_at?: string
-          first_name: string
+          family_id?: string | null
+          full_name: string
           id?: string
-          id_card_number?: string | null
-          last_name: string
-          photo_url?: string | null
           team_id?: string | null
           updated_at?: string
-          user_id?: string | null
         }
         Update: {
           birth_date?: string | null
           created_at?: string
-          first_name?: string
+          family_id?: string | null
+          full_name?: string
           id?: string
-          id_card_number?: string | null
-          last_name?: string
-          photo_url?: string | null
           team_id?: string | null
           updated_at?: string
-          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "players_team_id_fkey"
-            columns: ["team_id"]
+            foreignKeyName: "players_family_id_fkey"
+            columns: ["family_id"]
             isOneToOne: false
-            referencedRelation: "teams"
+            referencedRelation: "families_meta"
             referencedColumns: ["id"]
           },
         ]
@@ -204,38 +230,6 @@ export type Database = {
         }
         Relationships: []
       }
-      tutor_players: {
-        Row: {
-          created_at: string
-          id: string
-          player_id: string
-          relation: string
-          tutor_user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          player_id: string
-          relation?: string
-          tutor_user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          player_id?: string
-          relation?: string
-          tutor_user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tutor_players_player_id_fkey"
-            columns: ["player_id"]
-            isOneToOne: false
-            referencedRelation: "players"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_roles: {
         Row: {
           created_at: string
@@ -262,6 +256,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      compute_family_reference_code: {
+        Args: { _family_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
