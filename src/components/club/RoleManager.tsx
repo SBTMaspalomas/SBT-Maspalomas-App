@@ -99,7 +99,7 @@ export function RoleManager() {
   const changeRole = async (userId: string, newRole: Role) => {
     setSavingId(userId);
     await supabase.from("user_roles").delete().eq("user_id", userId);
-    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole });
+    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" });
     if (insErr) { toast.error("Error al asignar rol"); setSavingId(null); return; }
     if (newRole !== "coach") await supabase.from("coach_teams").delete().eq("user_id", userId);
     toast.success(`Rol actualizado a ${ROLE_LABEL[newRole]}`);
