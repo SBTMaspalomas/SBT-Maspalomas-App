@@ -227,4 +227,27 @@ export function Attendance() {
                     )}
                   </div>
                 );
-              }
+              })
+            )}
+          </div>
+
+          {monthlyLateStats.length > 0 && (
+            <div className="mt-6 rounded-xl border border-border/60 bg-muted/20 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Retrasos del mes</h3>
+              <ul className="space-y-1 text-sm">
+                {monthlyLateStats.map((s) => (
+                  <li key={s.id} className="flex justify-between">
+                    <span>{s.name}</span>
+                    <span className="text-muted-foreground">
+                      {s.lateCount} retrasos · {s.presentCount} presentes · {s.absentCount} ausentes
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
