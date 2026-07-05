@@ -32,6 +32,7 @@ export function Attendance() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [teamId, setTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [attendance, setAttendance] = useState<AttendanceMap>(() => loadAttendance());
 
   const today = new Date().toISOString().slice(0, 10);
@@ -42,35 +43,59 @@ export function Attendance() {
     let active = true;
     (async () => {
       setLoading(true);
-      // Load coach's team ids (admins see all teams)
-      let teamIds: string[] | null = null;
-      if (role !== "admin") {
-        const { data: ct } = await supabase
-          .from("coach_teams").select("team_id").eq("user_id", user.id);
-        teamIds = (ct ?? []).map((r) => r.team_id as string);
-      }
-      const teamsQ = supabase.from("teams").select("id, name, category").order("name");
-      const { data: teamsData } = teamIds
-        ? await teamsQ.in("id", teamIds.length ? teamIds : ["__none__"])
-        : await teamsQ;
+      setLoadError(null);
 
-      const { data: playersData } = await supabase
-        .from("players").select("id, full_name, team_id");
+      const [coachTeamsResult, teamsResult, playersResult] = await Promise.all([
+        role === "admin"
+          ? Promise.resolve({ data: [], error: null })
+          : supabase.from("coach_teams").select("team_id").eq("user_id", user.id),
+        supabase.from("teams").select("id, name, category").order("name"),
+        supabase.from("players").select("id, full_name, team_id").order("full_name"),
+      ]);
 
       if (!active) return;
-      const ts = (teamsData ?? []) as TeamRow[];
+
+      if (coachTeamsResult.error || teamsResult.error || playersResult.error) {
+        setTeams([]);
+        setPlayers([]);
+        setTeamId("");
+        setLoadError("No se pudieron cargar las asignaciones de asistencia.");
+        setLoading(false);
+        return;
+      }
+
+      const allTeams = (teamsResult.data ?? []) as TeamRow[];
+      const assignedTeamKeys = new Set(
+        (coachTeamsResult.data ?? [])
+          .map((r) => String(r.team_id ?? "").trim())
+          .filter(Boolean),
+      );
+      const ts = role === "admin"
+        ? allTeams
+        : allTeams.filter((team) =>
+            assignedTeamKeys.has(team.id)
+            || assignedTeamKeys.has(team.name)
+            || assignedTeamKeys.has(team.category),
+          );
+
       setTeams(ts);
-      setPlayers((playersData ?? []) as PlayerRow[]);
+      setPlayers((playersResult.data ?? []) as PlayerRow[]);
       setTeamId((prev) => prev && ts.find((t) => t.id === prev) ? prev : (ts[0]?.id ?? ""));
       setLoading(false);
     })();
     return () => { active = false; };
   }, [user, role]);
 
-  const teamPlayers = useMemo(
-    () => players.filter((p) => p.team_id === teamId),
-    [players, teamId],
+  const selectedTeam = useMemo(
+    () => teams.find((team) => team.id === teamId) ?? null,
+    [teams, teamId],
   );
+
+  const teamPlayers = useMemo(() => {
+    if (!selectedTeam) return [];
+    const teamKeys = new Set([selectedTeam.id, selectedTeam.name, selectedTeam.category]);
+    return players.filter((p) => p.team_id ? teamKeys.has(p.team_id) : false);
+  }, [players, selectedTeam]);
 
   const updateEntry = (playerId: string, patch: Partial<DayEntry>) => {
     setAttendance((prev) => {
@@ -107,6 +132,12 @@ export function Attendance() {
   if (loading) {
     return (
       <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando…</CardContent></Card>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Card><CardContent className="p-6 text-sm text-destructive">{loadError}</CardContent></Card>
     );
   }
 
