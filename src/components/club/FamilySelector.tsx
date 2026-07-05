@@ -142,7 +142,7 @@ function ChildTile({ child, onClick }: { child: FamilyChild; onClick: () => void
       <div className="text-center">
         <div className="text-sm font-bold">{child.full_name}</div>
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          {child.team_id ?? "sin equipo"}{age !== null && ` · ${age} años`}
+          {child.team_id?.toUpperCase() ?? "SIN EQUIPO"}
         </div>
       </div>
     </button>
@@ -172,7 +172,7 @@ function FamilyAgenda({ children }: { children: FamilyChild[] }) {
     <div className="rounded-2xl border border-border bg-surface p-4">
       <div className="mb-3 flex items-center gap-2">
         <CalendarDays className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-black uppercase tracking-wide">La agenda de la familia</h3>
+        <h3 className="text-sm font-black uppercase tracking-wide">PLAN SEMANAL</h3>
         <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">Semana en curso</span>
       </div>
       {items.length === 0 ? (
