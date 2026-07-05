@@ -1,85 +1,116 @@
-import { useMemo, useState } from "react";
-import { clubStore, useClub, currentUser } from "@/lib/clubStore";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type AttendanceStatus = "present" | "late" | "absent";
 type AbsenceReason = "justified" | "unjustified";
+interface DayEntry {
+  status?: AttendanceStatus;
+  absentReason?: AbsenceReason;
+}
+type AttendanceMap = Record<string, Record<string, DayEntry>>; // playerId -> date -> entry
+
+interface TeamRow { id: string; name: string; category: string }
+interface PlayerRow { id: string; full_name: string; team_id: string | null }
+
+const STORAGE_KEY = "attendance_v2";
+
+function loadAttendance(): AttendanceMap {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as AttendanceMap; }
+  catch { return {}; }
+}
+function saveAttendance(m: AttendanceMap) {
+  if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, JSON.stringify(m));
+}
 
 export function Attendance() {
-  const user = useClub(currentUser);
-  const teams = useClub((s) => s.teams);
-  const players = useClub((s) => s.players);
-  
-  const myTeams = teams.filter((t) => user.teamIds?.includes(t.id));
-  const [teamId, setTeamId] = useState(myTeams[0]?.id ?? "");
+  const { user, role } = useAuth();
+  const [teams, setTeams] = useState<TeamRow[]>([]);
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [teamId, setTeamId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [attendance, setAttendance] = useState<AttendanceMap>(() => loadAttendance());
+
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
-  
-  const teamPlayers = players.filter((p) => p.teamId === teamId);
 
-  const setAttendanceStatus = (playerId: string, status: AttendanceStatus) => {
-    clubStore.set((s) => {
-      const player = s.players.find((p) => p.id === playerId);
-      if (!player) return;
-      
-      const currentDay = player.attendance?.[date] ?? {};
-      const nextDay = {
-        ...currentDay,
-        status,
-        training: status === "present" || status === "late",
-        match: false,
-        absentReason: status === "absent" 
-          ? (currentDay.absentReason as AbsenceReason | undefined) ?? "unjustified"
-          : undefined,
-      };
-      
-      if (!player.attendance) player.attendance = {};
-      player.attendance[date] = nextDay;
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    (async () => {
+      setLoading(true);
+      // Load coach's team ids (admins see all teams)
+      let teamIds: string[] | null = null;
+      if (role !== "admin") {
+        const { data: ct } = await supabase
+          .from("coach_teams").select("team_id").eq("user_id", user.id);
+        teamIds = (ct ?? []).map((r) => r.team_id as string);
+      }
+      const teamsQ = supabase.from("teams").select("id, name, category").order("name");
+      const { data: teamsData } = teamIds
+        ? await teamsQ.in("id", teamIds.length ? teamIds : ["__none__"])
+        : await teamsQ;
+
+      const { data: playersData } = await supabase
+        .from("players").select("id, full_name, team_id");
+
+      if (!active) return;
+      const ts = (teamsData ?? []) as TeamRow[];
+      setTeams(ts);
+      setPlayers((playersData ?? []) as PlayerRow[]);
+      setTeamId((prev) => prev && ts.find((t) => t.id === prev) ? prev : (ts[0]?.id ?? ""));
+      setLoading(false);
+    })();
+    return () => { active = false; };
+  }, [user, role]);
+
+  const teamPlayers = useMemo(
+    () => players.filter((p) => p.team_id === teamId),
+    [players, teamId],
+  );
+
+  const updateEntry = (playerId: string, patch: Partial<DayEntry>) => {
+    setAttendance((prev) => {
+      const forPlayer = { ...(prev[playerId] ?? {}) };
+      forPlayer[date] = { ...(forPlayer[date] ?? {}), ...patch };
+      const next = { ...prev, [playerId]: forPlayer };
+      saveAttendance(next);
+      return next;
     });
   };
 
-  const setAbsenceReason = (playerId: string, reason: AbsenceReason) => {
-    clubStore.set((s) => {
-      const player = s.players.find((p) => p.id === playerId);
-      if (!player) return;
-      
-      const currentDay = player.attendance?.[date] ?? {};
-      if (!player.attendance) player.attendance = {};
-      player.attendance[date] = {
-        ...currentDay,
-        status: "absent",
-        training: false,
-        match: false,
-        absentReason: reason,
-      };
+  const setStatus = (playerId: string, status: AttendanceStatus) => {
+    updateEntry(playerId, {
+      status,
+      absentReason: status === "absent"
+        ? (attendance[playerId]?.[date]?.absentReason ?? "unjustified")
+        : undefined,
     });
   };
+  const setReason = (playerId: string, reason: AbsenceReason) =>
+    updateEntry(playerId, { status: "absent", absentReason: reason });
 
   const monthlyLateStats = useMemo(() => {
     const monthPrefix = new Date().toISOString().slice(0, 7);
-    return teamPlayers
-      .map((player) => {
-        const entries = Object.entries(player.attendance ?? {}).filter(([day]) =>
-          day.startsWith(monthPrefix)
-        );
-        
-        const lateCount = entries.filter(([, value]: [string, any]) => value?.status === "late").length;
-        const presentCount = entries.filter(([, value]: [string, any]) => value?.status === "present").length;
-        const absentCount = entries.filter(([, value]: [string, any]) => value?.status === "absent").length;
-        
-        return {
-          id: player.id,
-          name: `${player.firstName} ${player.lastName}`,
-          lateCount,
-          presentCount,
-          absentCount,
-        };
-      })
-      .sort((a, b) => b.lateCount - a.lateCount || a.name.localeCompare(b.name));
-  }, [teamPlayers]);
+    return teamPlayers.map((p) => {
+      const entries = Object.entries(attendance[p.id] ?? {}).filter(([d]) => d.startsWith(monthPrefix));
+      const lateCount = entries.filter(([, v]) => v?.status === "late").length;
+      const presentCount = entries.filter(([, v]) => v?.status === "present").length;
+      const absentCount = entries.filter(([, v]) => v?.status === "absent").length;
+      return { id: p.id, name: p.full_name, lateCount, presentCount, absentCount };
+    }).sort((a, b) => b.lateCount - a.lateCount || a.name.localeCompare(b.name));
+  }, [teamPlayers, attendance]);
 
-  if (myTeams.length === 0) {
+  if (loading) {
+    return (
+      <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando…</CardContent></Card>
+    );
+  }
+
+  if (teams.length === 0) {
     return (
       <Card>
         <CardContent className="p-6 text-sm text-muted-foreground">
@@ -100,15 +131,13 @@ export function Attendance() {
                 <SelectValue placeholder="Selecciona equipo" />
               </SelectTrigger>
               <SelectContent>
-                {myTeams.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
-                  </SelectItem>
+                {teams.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -129,7 +158,7 @@ export function Attendance() {
             )}
           </div>
         </CardHeader>
-        
+
         <CardContent>
           <div className="space-y-3">
             {teamPlayers.length === 0 ? (
@@ -138,58 +167,43 @@ export function Attendance() {
               </div>
             ) : (
               teamPlayers.map((player) => {
-                const day = player.attendance?.[date] ?? {};
-                const status = (day.status as AttendanceStatus | undefined) ?? null;
-                const absentReason = (day.absentReason as AbsenceReason | undefined) ?? "unjustified";
-                
+                const day = attendance[player.id]?.[date] ?? {};
+                const status = day.status ?? null;
+                const absentReason = day.absentReason ?? "unjustified";
                 return (
                   <div key={player.id} className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-                    <div className="mb-3">
-                      <div className="text-sm font-semibold text-foreground">
-                        {player.firstName} {player.lastName}
-                      </div>
-                    </div>
-                    
+                    <div className="mb-3 text-sm font-semibold text-foreground">{player.full_name}</div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                       <button
                         type="button"
-                        onClick={() => setAttendanceStatus(player.id, "present")}
+                        onClick={() => setStatus(player.id, "present")}
                         className={[
                           "flex h-14 items-center justify-center rounded-xl border text-sm font-semibold transition",
                           status === "present"
                             ? "border-emerald-700 bg-emerald-600 text-white shadow-sm"
                             : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
                         ].join(" ")}
-                      >
-                        Presente
-                      </button>
-                      
+                      >Presente</button>
                       <button
                         type="button"
-                        onClick={() => setAttendanceStatus(player.id, "late")}
+                        onClick={() => setStatus(player.id, "late")}
                         className={[
                           "flex h-14 items-center justify-center rounded-xl border text-sm font-semibold transition",
                           status === "late"
                             ? "border-amber-700 bg-amber-500 text-white shadow-sm"
                             : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
                         ].join(" ")}
-                      >
-                        <span className="mr-2 text-base">⏱️</span>
-                        Retraso
-                      </button>
-                      
+                      ><span className="mr-2 text-base">⏱️</span>Retraso</button>
                       <button
                         type="button"
-                        onClick={() => setAttendanceStatus(player.id, "absent")}
+                        onClick={() => setStatus(player.id, "absent")}
                         className={[
                           "flex h-14 items-center justify-center rounded-xl border text-sm font-semibold transition",
                           status === "absent"
                             ? "border-red-700 bg-red-600 text-white shadow-sm"
                             : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
                         ].join(" ")}
-                      >
-                        Ausente
-                      </button>
+                      >Ausente</button>
                     </div>
 
                     {status === "absent" && (
@@ -200,28 +214,24 @@ export function Attendance() {
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
-                            onClick={() => setAbsenceReason(player.id, "justified")}
+                            onClick={() => setReason(player.id, "justified")}
                             className={[
                               "rounded-lg border px-3 py-2 text-sm font-medium transition",
                               absentReason === "justified"
                                 ? "border-sky-700 bg-sky-600 text-white"
                                 : "border-border bg-background text-foreground hover:bg-muted",
                             ].join(" ")}
-                          >
-                            Justificada
-                          </button>
+                          >Justificada</button>
                           <button
                             type="button"
-                            onClick={() => setAbsenceReason(player.id, "unjustified")}
+                            onClick={() => setReason(player.id, "unjustified")}
                             className={[
                               "rounded-lg border px-3 py-2 text-sm font-medium transition",
                               absentReason === "unjustified"
                                 ? "border-slate-800 bg-slate-700 text-white"
                                 : "border-border bg-background text-foreground hover:bg-muted",
                             ].join(" ")}
-                          >
-                            Injustificada
-                          </button>
+                          >Injustificada</button>
                         </div>
                       </div>
                     )}
