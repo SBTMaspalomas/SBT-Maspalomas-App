@@ -34,7 +34,7 @@ export interface Player {
   docStatus: DocStatus;
   rejectReason?: string;
   payments: { period: "Septiembre" | "Noviembre" | "Febrero"; paid: boolean; receipt?: string }[];
-  attendance: Record<string, { training: boolean; match: boolean }>; // date -> marks
+  attendance: Record<string, { training: boolean; match: boolean; status?: "present" | "late" | "absent"; absentReason?: "justified" | "unjustified" }>; // date -> marks
 }
 
 export interface User {
