@@ -17,6 +17,8 @@ interface PlayerRow { id: string; full_name: string; team_id: string | null }
 
 const STORAGE_KEY = "attendance_v2";
 
+const keyOf = (value: string | null | undefined) => value?.trim().toLowerCase() ?? "";
+
 function loadAttendance(): AttendanceMap {
   if (typeof window === "undefined") return {};
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as AttendanceMap; }
@@ -67,15 +69,15 @@ export function Attendance() {
       const allTeams = (teamsResult.data ?? []) as TeamRow[];
       const assignedTeamKeys = new Set(
         (coachTeamsResult.data ?? [])
-          .map((r) => String(r.team_id ?? "").trim())
+          .map((r) => keyOf(String(r.team_id ?? "")))
           .filter(Boolean),
       );
       const ts = role === "admin"
         ? allTeams
         : allTeams.filter((team) =>
-            assignedTeamKeys.has(team.id)
-            || assignedTeamKeys.has(team.name)
-            || assignedTeamKeys.has(team.category),
+            assignedTeamKeys.has(keyOf(team.id))
+            || assignedTeamKeys.has(keyOf(team.name))
+            || assignedTeamKeys.has(keyOf(team.category)),
           );
 
       setTeams(ts);
@@ -93,8 +95,8 @@ export function Attendance() {
 
   const teamPlayers = useMemo(() => {
     if (!selectedTeam) return [];
-    const teamKeys = new Set([selectedTeam.id, selectedTeam.name, selectedTeam.category]);
-    return players.filter((p) => p.team_id ? teamKeys.has(p.team_id) : false);
+    const teamKeys = new Set([keyOf(selectedTeam.id), keyOf(selectedTeam.name), keyOf(selectedTeam.category)]);
+    return players.filter((p) => p.team_id ? teamKeys.has(keyOf(p.team_id)) : false);
   }, [players, selectedTeam]);
 
   const updateEntry = (playerId: string, patch: Partial<DayEntry>) => {
