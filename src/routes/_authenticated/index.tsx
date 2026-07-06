@@ -37,7 +37,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
   { id: "validacion", label: "Validación docs.", icon: ShieldCheck, roles: ["admin"] },
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family"] },
-  { id: "asistencia", label: "Asistencia", icon: ClipboardCheck, roles: ["coach"] },
+  { id: "asistencia", label: "Control de asistencia", icon: ClipboardCheck, roles: ["coach"] },
   { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player", "family"] },
   { id: "roles", label: "Usuarios y roles", icon: Users, roles: ["admin"] },
 ];
@@ -225,7 +225,7 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
         <QuickAction onClick={() => setView("cartelera")} title="Próximos partidos" desc={`${matches.length} programados`} />
         <QuickAction onClick={() => setView("chats")} title="Chats del club" desc="Equipo, padres y difusión" />
         {role === "admin" && <QuickAction onClick={() => setView("validacion")} title="Validar documentos" desc={`${stats.pending} pendientes`} />}
-        {role === "coach" && <QuickAction onClick={() => setView("asistencia")} title="Tomar asistencia" desc="Entreno y partido" />}
+        {role === "coach" && <QuickAction onClick={() => setView("asistencia")} title="Control de asistencia" desc="Entreno y partido" />}
         {(role === "parent" || role === "family") && <QuickAction onClick={() => setView("pagos")} title="Mis cuotas" desc="Estado y justificantes" />}
       </div>
     </div>
