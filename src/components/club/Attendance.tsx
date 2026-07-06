@@ -158,7 +158,7 @@ export function Attendance() {
       <Card className="border-border/60 shadow-sm">
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-xl">Asistencia</CardTitle>
+            <CardTitle className="text-xl">Control de asistencia</CardTitle>
             <Select value={teamId} onValueChange={setTeamId}>
               <SelectTrigger className="w-full sm:w-56">
                 <SelectValue placeholder="Selecciona equipo" />
@@ -216,7 +216,7 @@ export function Attendance() {
                             ? "border-emerald-700 bg-emerald-600 text-white shadow-sm"
                             : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
                         ].join(" ")}
-                      >Presente</button>
+                      >Asiste</button>
                       <button
                         type="button"
                         onClick={() => setStatus(player.id, "late")}
@@ -236,7 +236,7 @@ export function Attendance() {
                             ? "border-red-700 bg-red-600 text-white shadow-sm"
                             : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
                         ].join(" ")}
-                      >Ausente</button>
+                      >Falta</button>
                     </div>
 
                     {status === "absent" && (
