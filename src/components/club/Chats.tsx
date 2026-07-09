@@ -156,6 +156,20 @@ export function Chats() {
     if (!channels.length) setActive("");
   }, [channels, active]);
 
+  // Listen for admin "open private chat" event
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<{ familyId: string }>).detail;
+      if (!detail?.familyId) return;
+      const target = `private-${detail.familyId}`;
+      const match = channels.find((c) => c.id === target);
+      if (match) setActive(match.id);
+    };
+    window.addEventListener("open-private-chat", onOpen);
+    return () => window.removeEventListener("open-private-chat", onOpen);
+  }, [channels]);
+
+
   const channel = channels.find((c) => c.id === active);
 
   // Load messages for active channel and subscribe realtime
