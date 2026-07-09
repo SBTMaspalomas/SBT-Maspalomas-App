@@ -49,6 +49,13 @@ function ClubApp() {
   const [view, setView] = useState<View>("inicio");
   const [navOpen, setNavOpen] = useState(false);
 
+  useEffect(() => {
+    const onOpen = () => setView("chats");
+    window.addEventListener("open-private-chat", onOpen as EventListener);
+    return () => window.removeEventListener("open-private-chat", onOpen as EventListener);
+  }, []);
+
+
   const handleSignOut = async () => {
     await auth.signOut();
     navigate({ to: "/auth" });
