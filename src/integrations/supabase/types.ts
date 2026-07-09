@@ -138,6 +138,41 @@ export type Database = {
           },
         ]
       }
+      private_messages: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message_text: string
+          receiver_family_id: string
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message_text: string
+          receiver_family_id: string
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message_text?: string
+          receiver_family_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_messages_receiver_family_id_fkey"
+            columns: ["receiver_family_id"]
+            isOneToOne: false
+            referencedRelation: "families_meta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -206,8 +241,47 @@ export type Database = {
           },
         ]
       }
+      team_messages: {
+        Row: {
+          channel_type: string
+          created_at: string
+          id: string
+          message_text: string
+          sender_id: string
+          sender_name: string
+          team_id: string | null
+        }
+        Insert: {
+          channel_type: string
+          created_at?: string
+          id?: string
+          message_text: string
+          sender_id: string
+          sender_name: string
+          team_id?: string | null
+        }
+        Update: {
+          channel_type?: string
+          created_at?: string
+          id?: string
+          message_text?: string
+          sender_id?: string
+          sender_name?: string
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_messages_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
+          age_category: string | null
           category: string
           created_at: string
           id: string
@@ -215,6 +289,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          age_category?: string | null
           category: string
           created_at?: string
           id?: string
@@ -222,6 +297,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          age_category?: string | null
           category?: string
           created_at?: string
           id?: string
@@ -260,11 +336,16 @@ export type Database = {
         Args: { _family_id: string }
         Returns: string
       }
+      derive_age_category: { Args: { _category: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      user_can_access_team_channel: {
+        Args: { _channel: string; _team_id: string; _user_id: string }
         Returns: boolean
       }
     }
