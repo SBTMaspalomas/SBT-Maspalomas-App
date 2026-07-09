@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Shield, Users, Search, RefreshCw, Baby } from "lucide-react";
+import { Shield, Users, Search, RefreshCw, Baby, MessageSquareLock } from "lucide-react";
 
 type Role = "admin" | "coach" | "family";
 
@@ -229,16 +229,28 @@ export function RoleManager() {
 
                 {u.role === "family" && (
                   <div className="rounded-lg border border-border bg-background p-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                         Hijos/as vinculados ({u.childCount})
                       </div>
-                      {u.referenceCode && (
-                        <span className="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
-                          {u.referenceCode}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {u.referenceCode && (
+                          <span className="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
+                            {u.referenceCode}
+                          </span>
+                        )}
+                        {u.familyId && (
+                          <Button
+                            size="sm" variant="outline" className="h-7 gap-1 text-xs"
+                            onClick={() => window.dispatchEvent(new CustomEvent("open-private-chat", { detail: { familyId: u.familyId } }))}
+                          >
+                            <MessageSquareLock className="h-3.5 w-3.5" />
+                            Chat privado
+                          </Button>
+                        )}
+                      </div>
                     </div>
+
                     {players.length === 0 ? (
                       <p className="text-xs text-muted-foreground">No hay jugadores en la base de datos.</p>
                     ) : (

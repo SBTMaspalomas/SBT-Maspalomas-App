@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { clubStore, useClub, currentUser } from "@/lib/clubStore";
@@ -48,6 +48,13 @@ function ClubApp() {
   const user = useClub(currentUser);
   const [view, setView] = useState<View>("inicio");
   const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    const onOpen = () => setView("chats");
+    window.addEventListener("open-private-chat", onOpen as EventListener);
+    return () => window.removeEventListener("open-private-chat", onOpen as EventListener);
+  }, []);
+
 
   const handleSignOut = async () => {
     await auth.signOut();
