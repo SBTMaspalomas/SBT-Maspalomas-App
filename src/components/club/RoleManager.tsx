@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Shield, Users, Search, RefreshCw, Baby } from "lucide-react";
+import { Shield, Users, Search, RefreshCw, Baby, MessageSquareLock } from "lucide-react";
 
 type Role = "admin" | "coach" | "family";
 
