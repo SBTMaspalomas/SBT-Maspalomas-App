@@ -60,13 +60,14 @@ async function loadRoleAndProfile(userId: string) {
     supabase.from("coach_teams").select("team_id").eq("user_id", userId),
   ]);
   
-  // Priorizar admin > coach > parent > family
+  // Priorizar admin > coach > parent > player > family
   let role: Role = "family";
   if (roleRows && roleRows.length > 0) {
     const roles = roleRows.map((r) => r.role);
     if (roles.includes("admin")) role = "admin";
     else if (roles.includes("coach")) role = "coach";
     else if (roles.includes("parent")) role = "parent";
+    else if (roles.includes("player")) role = "player";
     else role = roles[0] as Role;
   }
   

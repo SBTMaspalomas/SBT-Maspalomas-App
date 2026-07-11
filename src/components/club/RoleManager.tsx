@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Shield, Users, Search, RefreshCw, Baby, MessageSquareLock } from "lucide-react";
 
-type Role = "admin" | "coach" | "family";
+type Role = "admin" | "coach" | "parent" | "player" | "family";
 
 interface TeamRow { id: string; name: string; category: string; }
 interface PlayerRow { id: string; full_name: string; birth_date: string | null; team_id: string | null; family_id: string | null; }
@@ -25,6 +25,8 @@ interface Row {
 const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrador",
   coach: "Entrenador",
+  parent: "Padre/Madre",
+  player: "Jugador",
   family: "Familia",
 };
 
@@ -75,6 +77,7 @@ export function RoleManager() {
       if (roleList.includes("admin")) role = "admin";
       else if (roleList.includes("coach")) role = "coach";
       else if (roleList.includes("parent")) role = "parent";
+      else if (roleList.includes("player")) role = "player";
       else role = roleList[0];
       roleMap.set(userId, role);
     });
@@ -115,7 +118,7 @@ export function RoleManager() {
     // Delete all existing roles for this user
     await supabase.from("user_roles").delete().eq("user_id", userId);
     // Insert the new role
-    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" | "parent" });
+    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" | "parent" | "player" });
     if (insErr) { toast.error("Error al asignar rol"); setSavingId(null); return; }
     // Clean up coach_teams if not a coach
     if (newRole !== "coach") await supabase.from("coach_teams").delete().eq("user_id", userId);
@@ -209,7 +212,7 @@ export function RoleManager() {
                     "bg-surface-elevated text-muted-foreground"
                   }`}>{ROLE_LABEL[u.role]}</span>
                   <div className="flex w-full flex-wrap gap-1 sm:w-auto">
-                    {(["family", "coach", "admin"] as Role[]).map((r) => (
+                    {(["family", "player", "parent", "coach", "admin"] as Role[]).map((r) => (
                       <Button
                         key={r} size="sm"
                         variant={u.role === r ? "default" : "outline"}
