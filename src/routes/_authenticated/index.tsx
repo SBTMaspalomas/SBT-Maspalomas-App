@@ -17,6 +17,8 @@ import { FamilySelector } from "@/components/club/FamilySelector";
 import { PlayersList } from "@/components/club/PlayersList";
 import { TeamsManager } from "@/components/club/TeamsManager";
 import { PlayerTeamAssignment } from "@/components/club/PlayerTeamAssignment";
+import { ConvocatoriesManager } from "@/components/club/ConvocatoriesManager";
+import { ConvocatoriesPlayer } from "@/components/club/ConvocatoriesPlayer";
 import type { Role } from "@/lib/clubStore";
 import {
   LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap,
@@ -32,7 +34,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "jugadores" | "equipos" | "asignacion";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "jugadores" | "equipos" | "asignacion" | "convocatorias" | "mis-convocatorias";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family"] },
@@ -42,6 +44,8 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "jugadores", label: "Jugadores", icon: Users2, roles: ["admin"] },
   { id: "equipos", label: "Equipos", icon: Zap, roles: ["admin"] },
   { id: "asignacion", label: "Asignar Equipos", icon: Trophy, roles: ["admin"] },
+  { id: "convocatorias", label: "Convocatorias", icon: ClipboardCheck, roles: ["admin", "coach"] },
+  { id: "mis-convocatorias", label: "Mis Convocatorias", icon: ClipboardCheck, roles: ["player"] },
   { id: "validacion", label: "Validación docs.", icon: ShieldCheck, roles: ["admin"] },
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family"] },
   { id: "asistencia", label: "Control de asistencia", icon: ClipboardCheck, roles: ["coach"] },
@@ -183,6 +187,8 @@ function ClubApp() {
               {view === "jugadores" && auth.role === "admin" && <PlayersList />}
               {view === "equipos" && auth.role === "admin" && <TeamsManager />}
               {view === "asignacion" && auth.role === "admin" && <PlayerTeamAssignment />}
+              {view === "convocatorias" && (auth.role === "admin" || auth.role === "coach") && <ConvocatoriesManager />}
+              {view === "mis-convocatorias" && auth.role === "player" && <ConvocatoriesPlayer />}
               {view === "validacion" && auth.role === "admin" && <ValidationConsole />}
               {view === "pagos" && auth.role === "admin" && <PaymentsAdmin />}
               {view === "pagos" && (auth.role === "parent" || auth.role === "family") && <PaymentsParent />}
