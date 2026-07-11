@@ -10,7 +10,7 @@ import { ValidationConsole } from "@/components/club/ValidationConsole";
 import { PaymentsAdmin, PaymentsParent } from "@/components/club/Payments";
 import { Attendance } from "@/components/club/Attendance";
 import { Chats } from "@/components/club/Chats";
-import { Board } from "@/components/club/Board";
+import { NewsBoard } from "@/components/club/NewsBoard";
 import { RoleManager } from "@/components/club/RoleManager";
 import { PlayerView } from "@/components/club/PlayerView";
 import { FamilySelector } from "@/components/club/FamilySelector";
@@ -182,7 +182,7 @@ function ClubApp() {
             <>
               {view === "inicio" && <Home setView={setView} effectiveRole={effectiveRole} />}
               {view === "mizona" && <PlayerView />}
-              {view === "cartelera" && <Board />}
+              {view === "cartelera" && <NewsBoard />}
               {view === "registro" && <RegistrationFlow />}
               {view === "jugadores" && auth.role === "admin" && <PlayersList />}
               {view === "equipos" && auth.role === "admin" && <TeamsManager />}
