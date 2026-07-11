@@ -54,13 +54,24 @@ const DEMO_USER_BY_ROLE: Record<Role, string> = {
 };
 
 async function loadRoleAndProfile(userId: string) {
-  const [{ data: roleRow }, { data: profile }, { data: teamRows }] = await Promise.all([
-    supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+  const [{ data: roleRows }, { data: profile }, { data: teamRows }] = await Promise.all([
+    supabase.from("user_roles").select("role").eq("user_id", userId),
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
     supabase.from("coach_teams").select("team_id").eq("user_id", userId),
   ]);
+  
+  // Priorizar admin > coach > parent > family
+  let role: Role = "family";
+  if (roleRows && roleRows.length > 0) {
+    const roles = roleRows.map((r) => r.role);
+    if (roles.includes("admin")) role = "admin";
+    else if (roles.includes("coach")) role = "coach";
+    else if (roles.includes("parent")) role = "parent";
+    else role = roles[0] as Role;
+  }
+  
   return {
-    role: (roleRow?.role ?? "family") as Role,
+    role,
     fullName: profile?.full_name ?? null,
     teamIds: (teamRows ?? []).map((r) => r.team_id),
   };
