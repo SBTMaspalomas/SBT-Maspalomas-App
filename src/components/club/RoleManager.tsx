@@ -62,8 +62,22 @@ export function RoleManager() {
     setPlayers((playersData ?? []) as PlayerRow[]);
     setFamilies((familiesData ?? []) as FamilyRow[]);
 
+    // Build role map with priority: admin > coach > parent > family
     const roleMap = new Map<string, Role>();
-    (roles ?? []).forEach((r) => roleMap.set(r.user_id, r.role as Role));
+    const rolesByUser = new Map<string, Role[]>();
+    (roles ?? []).forEach((r) => {
+      const arr = rolesByUser.get(r.user_id) ?? [];
+      arr.push(r.role as Role);
+      rolesByUser.set(r.user_id, arr);
+    });
+    rolesByUser.forEach((roleList, userId) => {
+      let role: Role = "family";
+      if (roleList.includes("admin")) role = "admin";
+      else if (roleList.includes("coach")) role = "coach";
+      else if (roleList.includes("parent")) role = "parent";
+      else role = roleList[0];
+      roleMap.set(userId, role);
+    });
     const teamMap = new Map<string, string[]>();
     (ct ?? []).forEach((r) => {
       const arr = teamMap.get(r.user_id) ?? []; arr.push(r.team_id); teamMap.set(r.user_id, arr);
@@ -83,7 +97,7 @@ export function RoleManager() {
           id: p.id,
           email: p.email,
           full_name: p.full_name,
-          role: (roleMap.get(p.id) ?? "family") as Role,
+          role: roleMap.get(p.id) ?? "family",
           teamIds: teamMap.get(p.id) ?? [],
           familyId: fam?.id ?? null,
           referenceCode: fam?.reference_code ?? null,
@@ -98,9 +112,12 @@ export function RoleManager() {
 
   const changeRole = async (userId: string, newRole: Role) => {
     setSavingId(userId);
+    // Delete all existing roles for this user
     await supabase.from("user_roles").delete().eq("user_id", userId);
-    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" });
+    // Insert the new role
+    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" | "parent" });
     if (insErr) { toast.error("Error al asignar rol"); setSavingId(null); return; }
+    // Clean up coach_teams if not a coach
     if (newRole !== "coach") await supabase.from("coach_teams").delete().eq("user_id", userId);
     toast.success(`Rol actualizado a ${ROLE_LABEL[newRole]}`);
     setSavingId(null); load();
