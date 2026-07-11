@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { clubStore, useClub, currentUser } from "@/lib/clubStore";
 import { useAuth } from "@/lib/auth-context";
+import { useClubData } from "@/hooks/use-club-data";
 import { RegistrationFlow } from "@/components/club/RegistrationFlow";
 import { ValidationConsole } from "@/components/club/ValidationConsole";
 import { PaymentsAdmin, PaymentsParent } from "@/components/club/Payments";
@@ -44,6 +45,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
 
 function ClubApp() {
   const auth = useAuth();
+  useClubData();
   const navigate = useNavigate();
   const user = useClub(currentUser);
   const [view, setView] = useState<View>("inicio");

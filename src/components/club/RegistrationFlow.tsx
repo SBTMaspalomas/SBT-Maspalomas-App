@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SignaturePad } from "./SignaturePad";
 import { clubStore } from "@/lib/clubStore";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { Download, Upload, FileText, CheckCircle2 } from "lucide-react";
 
@@ -30,7 +32,9 @@ const FileButton = ({ label, value, onChange, accept = "image/*" }: { label: str
 );
 
 export function RegistrationFlow() {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "",
     tutorName: "", tutorDni: "", tutorAddress: "", tutorPhone: "", tutorEmail: "",
@@ -46,39 +50,47 @@ export function RegistrationFlow() {
   });
   const set = (k: keyof typeof form, v: string | boolean | undefined) => setForm((f) => ({ ...f, [k]: v }));
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.auth_image || !form.auth_travel || !form.auth_medical) {
       toast.error("Debes marcar las 3 autorizaciones obligatorias.");
       return;
     }
     if (!form.signature) { toast.error("Falta la firma del tutor."); return; }
     if (!form.federativaPdf) { toast.error("Sube la ficha federativa firmada (PDF)."); return; }
-    clubStore.set((s) => {
-      s.players.push({
-        id: `p-${Date.now()}`,
-        firstName: form.firstName || "Sin nombre",
-        lastName: form.lastName || "",
-        birthDate: form.birthDate || "2014-01-01",
-        docType: form.docType as never,
-        docNumber: form.docNumber,
-        teamId: form.teamId,
-        parentId: "u-parent1",
-        photo: form.photo, dniFront: form.dniFront, dniBack: form.dniBack,
-        tutorDniFront: form.tutorDniFront, tutorDniBack: form.tutorDniBack,
-        federativaPdf: form.federativaPdf, signature: form.signature,
-        auth_image: form.auth_image, auth_travel: form.auth_travel, auth_medical: form.auth_medical,
-        docStatus: "pending",
-        payments: [
-          { period: "Septiembre", paid: false },
-          { period: "Noviembre", paid: false },
-          { period: "Febrero", paid: false },
-        ],
-        attendance: {},
+    if (!user) { toast.error("Debes iniciar sesión."); return; }
+
+    setIsSubmitting(true);
+    try {
+      // 1. Asegurar que existe family_meta para este usuario
+      let { data: family } = await supabase.from("families_meta").select("id").eq("head_profile_id", user.id).maybeSingle();
+      if (!family) {
+        const { data: newFamily, error: famErr } = await supabase.from("families_meta").insert({
+          head_profile_id: user.id,
+          head_email: user.email
+        }).select().single();
+        if (famErr) throw famErr;
+        family = newFamily;
+      }
+
+      // 2. Insertar jugador
+      const { error: pErr } = await supabase.from("players").insert({
+        family_id: family.id,
+        full_name: `${form.firstName} ${form.lastName}`,
+        birth_date: form.birthDate,
+        team_id: form.teamId,
+        // En una fase posterior subiremos los archivos a Storage
       });
-    });
-    toast.success("Registro enviado. Pendiente de validación.");
-    setStep(1);
-    setForm({ ...form, firstName: "", lastName: "", docNumber: "", signature: undefined, photo: undefined, dniFront: undefined, dniBack: undefined, tutorDniFront: undefined, tutorDniBack: undefined, federativaPdf: undefined, auth_image: false, auth_travel: false, auth_medical: false });
+      if (pErr) throw pErr;
+
+      toast.success("Registro enviado correctamente a Supabase.");
+      setStep(1);
+      setForm({ ...form, firstName: "", lastName: "", docNumber: "", signature: undefined, photo: undefined, dniFront: undefined, dniBack: undefined, tutorDniFront: undefined, tutorDniBack: undefined, federativaPdf: undefined, auth_image: false, auth_travel: false, auth_medical: false });
+    } catch (error: any) {
+      console.error("Error al registrar:", error);
+      toast.error("Error al enviar el registro: " + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -189,7 +201,7 @@ export function RegistrationFlow() {
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(2)}>Atrás</Button>
-              <Button onClick={submit}>Enviar registro</Button>
+              <Button onClick={submit} disabled={isSubmitting}>{isSubmitting ? "Enviando..." : "Enviar registro"}</Button>
             </div>
           </div>
         )}
