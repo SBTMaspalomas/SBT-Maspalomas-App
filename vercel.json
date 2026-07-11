@@ -4,12 +4,4 @@
   "installCommand": "npm install",
   "framework": "vite",
   "outputDirectory": "dist",
-  "env": {
-    "VITE_SUPABASE_URL": {
-      "description": "URL del proyecto Supabase"
-    },
-    "VITE_SUPABASE_PUBLISHABLE_KEY": {
-      "description": "Anon Key de Supabase"
-    }
-  }
 }
