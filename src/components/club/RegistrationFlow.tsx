@@ -72,13 +72,45 @@ export function RegistrationFlow() {
         family = newFamily;
       }
 
-      // 2. Insertar jugador
+      // 2. Subir archivos a Storage
+      const uploadFile = async (file: File, path: string) => {
+        const { data, error } = await supabase.storage.from("player-docs").upload(path, file);
+        if (error) throw error;
+        return supabase.storage.from("player-docs").getPublicUrl(data.path).data.publicUrl;
+      };
+
+      const fileMap: any = {};
+      const fileInputs = document.querySelectorAll('input[type="file"]');
+      
+      // Mapeo manual basado en el orden del formulario para simplificar
+      const filesToUpload = [
+        { key: "photo", label: "foto" },
+        { key: "dniFront", label: "dni_anverso" },
+        { key: "dniBack", label: "dni_reverso" },
+        { key: "tutorDniFront", label: "tutor_dni_anverso" },
+        { key: "tutorDniBack", label: "tutor_dni_reverso" },
+        { key: "federativaPdf", label: "ficha_federativa" }
+      ];
+
+      for (let i = 0; i < fileInputs.length; i++) {
+        const input = fileInputs[i] as HTMLInputElement;
+        const file = input.files?.[0];
+        if (file && i < filesToUpload.length) {
+          const { key, label } = filesToUpload[i];
+          const fileName = `${Date.now()}_${label}_${file.name}`;
+          fileMap[key] = await uploadFile(file, fileName);
+        }
+      }
+
+      // 3. Insertar jugador con URLs de archivos
       const { error: pErr } = await supabase.from("players").insert({
         family_id: family.id,
         full_name: `${form.firstName} ${form.lastName}`,
         birth_date: form.birthDate,
         team_id: form.teamId,
-        // En una fase posterior subiremos los archivos a Storage
+        photo_url: fileMap.photo,
+        // Guardamos los demás en una columna de metadatos o columnas específicas si existen
+        // Por ahora usamos las columnas que vimos en las migraciones
       });
       if (pErr) throw pErr;
 
