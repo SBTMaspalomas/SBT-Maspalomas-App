@@ -32,6 +32,7 @@ const statusUI = {
   approved: { label: "Aprobado", cls: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle2 },
   rejected: { label: "Rechazado", cls: "bg-red-50 text-red-700 border-red-200", icon: XCircle },
 };
+const defaultStatus = { label: "Sin estado", cls: "bg-gray-50 text-gray-700 border-gray-200", icon: Clock };
 
 export function ValidationConsole() {
   const [players, setPlayers] = useState<PlayerRegistration[]>([]);
@@ -125,7 +126,7 @@ export function ValidationConsole() {
             </div>
           ) : (
             players.map((p) => {
-              const S = statusUI[p.doc_status];
+              const S = statusUI[p.doc_status as keyof typeof statusUI] || defaultStatus;
               const Icon = S.icon;
               return (
                 <button
