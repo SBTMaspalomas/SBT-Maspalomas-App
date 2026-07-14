@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Shield, Users, Search, RefreshCw, Baby, MessageSquareLock } from "lucide-react";
+import { Shield, Users, Search, RefreshCw, Baby, MessageSquareLock, Filter } from "lucide-react";
 
 type Role = "admin" | "coach" | "parent" | "player" | "family";
 
@@ -16,10 +16,12 @@ interface Row {
   email: string;
   full_name: string | null;
   role: Role;
-  teamIds: string[];       // coach
-  familyId: string | null; // family (head_profile_id)
+  teamIds: string[];
+  familyId: string | null;
   referenceCode: string | null;
   childCount: number;
+  phone: string | null;
+  created_at: string | null;
 }
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -38,6 +40,7 @@ export function RoleManager() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,7 +52,7 @@ export function RoleManager() {
       { data: playersData, error: plErr },
       { data: familiesData, error: fErr },
     ] = await Promise.all([
-      supabase.from("profiles").select("id, email, full_name").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, email, full_name, phone, created_at").order("created_at", { ascending: false }),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("coach_teams").select("user_id, team_id"),
       supabase.from("teams").select("id, name, category").order("name"),
@@ -64,7 +67,6 @@ export function RoleManager() {
     setPlayers((playersData ?? []) as PlayerRow[]);
     setFamilies((familiesData ?? []) as FamilyRow[]);
 
-    // Build role map with priority: admin > coach > parent > family
     const roleMap = new Map<string, Role>();
     const rolesByUser = new Map<string, Role[]>();
     (roles ?? []).forEach((r) => {
@@ -105,6 +107,8 @@ export function RoleManager() {
           familyId: fam?.id ?? null,
           referenceCode: fam?.reference_code ?? null,
           childCount: fam ? (childCountByFam.get(fam.id) ?? 0) : 0,
+          phone: (p as any).phone ?? null,
+          created_at: (p as any).created_at ?? null,
         };
       }),
     );
@@ -115,12 +119,9 @@ export function RoleManager() {
 
   const changeRole = async (userId: string, newRole: Role) => {
     setSavingId(userId);
-    // Delete all existing roles for this user
     await supabase.from("user_roles").delete().eq("user_id", userId);
-    // Insert the new role
     const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" | "parent" | "player" });
     if (insErr) { toast.error("Error al asignar rol"); setSavingId(null); return; }
-    // Clean up coach_teams if not a coach
     if (newRole !== "coach") await supabase.from("coach_teams").delete().eq("user_id", userId);
     toast.success(`Rol actualizado a ${ROLE_LABEL[newRole]}`);
     setSavingId(null); load();
@@ -134,7 +135,6 @@ export function RoleManager() {
   };
 
   const ensureFamily = async (userId: string, email: string): Promise<string | null> => {
-    // Try to find an existing family for this user (or one that matches their email)
     const existing = families.find((f) => f.head_profile_id === userId)
       ?? families.find((f) => f.head_email === email && !f.head_profile_id);
     if (existing) {
@@ -167,27 +167,55 @@ export function RoleManager() {
 
   const filtered = rows.filter((r) => {
     const s = q.trim().toLowerCase();
-    if (!s) return true;
-    return r.email.toLowerCase().includes(s) || (r.full_name ?? "").toLowerCase().includes(s);
+    const matchesSearch = !s || r.email.toLowerCase().includes(s) || (r.full_name ?? "").toLowerCase().includes(s);
+    const matchesRole = roleFilter === "all" || r.role === roleFilter;
+    return matchesSearch && matchesRole;
   });
+
+  const formatDate = (d: string | null) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-black">Usuarios y roles</h2>
+          <h2 className="text-lg font-black">Miembros Registrados</h2>
         </div>
+        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">{rows.length} total</span>
         <Button variant="outline" size="sm" className="ml-auto" onClick={load} disabled={loading}>
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </div>
 
-      <div className="rounded-xl border border-border bg-surface p-3">
+      <div className="rounded-xl border border-border bg-surface p-3 space-y-2">
         <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-2">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por email o nombre…" className="border-0 bg-transparent focus-visible:ring-0" />
         </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground mr-1">Filtrar:</span>
+          {(["all", "admin", "coach", "parent", "family", "player"] as const).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRoleFilter(r)}
+              className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                roleFilter === r
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-muted-foreground hover:border-primary"
+              }`}
+            >
+              {r === "all" ? "Todos" : ROLE_LABEL[r]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="text-xs text-muted-foreground">
+        Mostrando {filtered.length} de {rows.length} miembros
       </div>
 
       <div className="rounded-xl border border-border bg-surface">
@@ -195,7 +223,7 @@ export function RoleManager() {
           <div className="p-6 text-center text-sm text-muted-foreground">Cargando…</div>
         ) : filtered.length === 0 ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
-            <Users className="mx-auto mb-2 h-6 w-6" />Sin usuarios.
+            <Users className="mx-auto mb-2 h-6 w-6" />Sin miembros encontrados.
           </div>
         ) : (
           <ul className="divide-y divide-border">
@@ -205,6 +233,8 @@ export function RoleManager() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{u.full_name || u.email.split("@")[0]}</div>
                     <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                    {u.phone && <div className="text-xs text-muted-foreground">Tel: {u.phone}</div>}
+                    {u.created_at && <div className="text-[10px] text-muted-foreground/70">Registrado: {formatDate(u.created_at)}</div>}
                   </div>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                     u.role === "admin" ? "bg-primary/15 text-primary" :
