@@ -85,11 +85,6 @@ export function RegistrationFlow() {
       return;
     }
 
-    // Si hay hijos, validar autorizaciones de menores
-    if (adult.isResponsible && children.length > 0) {
-      // Las autorizaciones de menores son opcionales, no hay validación
-    }
-
     if (!docs.signature) {
       toast.error("Falta la firma");
       return;
@@ -107,6 +102,7 @@ export function RegistrationFlow() {
         id: user.id,
         email: adult.email,
         full_name: `${adult.firstName} ${adult.lastName}`,
+        phone: adult.phone,
       });
       if (profileErr) throw profileErr;
 
@@ -125,14 +121,14 @@ export function RegistrationFlow() {
         familyId = family.id;
       }
 
-      // 3. Subir archivos
+      // 3. Subir archivos al storage
       const uploadFile = async (file: File, path: string) => {
-        const { data, error } = await supabase.storage.from("player-docs").upload(path, file);
+        const { data, error } = await supabase.storage.from("player-docs").upload(path, file, { upsert: true });
         if (error) throw error;
         return supabase.storage.from("player-docs").getPublicUrl(data.path).data.publicUrl;
       };
 
-      const fileMap: any = {};
+      const fileMap: Record<string, string> = {};
       const fileInputs = document.querySelectorAll('input[type="file"]');
       const filesToUpload = [
         { key: "photo", label: "foto" },
@@ -150,14 +146,53 @@ export function RegistrationFlow() {
         }
       }
 
-      // 4. Crear hijos si aplica (guardar como players con family_id)
+      // 4. Guardar registro del ADULTO en tabla registrations
+      const { data: adultReg, error: adultRegErr } = await supabase.from("registrations").insert({
+        user_id: user.id,
+        type: "adult",
+        full_name: `${adult.firstName} ${adult.lastName}`,
+        doc_type: adult.docType,
+        doc_number: adult.docNumber,
+        birth_date: adult.birthDate || null,
+        phone: adult.phone,
+        email: adult.email,
+        photo_url: fileMap.photo || null,
+        dni_front_url: fileMap.dniFront || null,
+        dni_back_url: fileMap.dniBack || null,
+        signature_url: docs.signature || null,
+        auth_image: docs.auth_image,
+        auth_travel: docs.auth_travel,
+        auth_medical: docs.auth_medical,
+        auth_data_sharing: docs.auth_data_sharing,
+        family_id: familyId,
+        doc_status: "pending",
+      }).select().single();
+      if (adultRegErr) throw adultRegErr;
+
+      // 5. Guardar registros de MENORES en tabla registrations + players
       if (adult.isResponsible && children.length > 0 && familyId) {
         for (const child of children) {
+          // Insertar en registrations
+          await supabase.from("registrations").insert({
+            user_id: user.id,
+            type: "minor",
+            full_name: `${child.firstName} ${child.lastName}`,
+            doc_type: "DNI",
+            doc_number: child.docNumber,
+            birth_date: child.birthDate || null,
+            auth_image: docs.auth_image,
+            auth_travel: docs.auth_travel,
+            auth_medical: docs.auth_medical,
+            auth_data_sharing: docs.auth_data_sharing,
+            family_id: familyId,
+            parent_registration_id: adultReg?.id || null,
+            doc_status: "pending",
+          });
+          // Insertar en players para gestión de equipos
           await supabase.from("players").insert({
             family_id: familyId,
             full_name: `${child.firstName} ${child.lastName}`,
             birth_date: child.birthDate,
-            document_number: child.docNumber
           } as any);
         }
       }
