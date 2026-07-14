@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { Upload, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const FileButton = ({ label, value, onChange, accept = "image/*" }: { label: string; value?: string; onChange: (name: string) => void; accept?: string }) => (
   <label className="flex cursor-pointer items-center justify-between rounded-md border border-dashed border-border bg-surface px-3 py-2.5 text-sm hover:border-primary">
@@ -32,11 +32,21 @@ const FileButton = ({ label, value, onChange, accept = "image/*" }: { label: str
   </label>
 );
 
-export function RegistrationFlow() {
+export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {}) {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [teams, setTeams] = useState<Array<{id: string; name: string; category: string}>>([]);
   
+  // Cargar equipos disponibles
+  useEffect(() => {
+    const loadTeams = async () => {
+      const { data } = await supabase.from("teams").select("id, name, category").order("name");
+      if (data) setTeams(data);
+    };
+    loadTeams();
+  }, []);
+
   // Datos del adulto
   const [adult, setAdult] = useState({
     firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "",
@@ -44,8 +54,8 @@ export function RegistrationFlow() {
   });
   
   // Datos de hijos
-  const [children, setChildren] = useState<Array<{firstName: string; lastName: string; birthDate: string; docNumber: string}>>([]);
-  const [currentChild, setCurrentChild] = useState({firstName: "", lastName: "", birthDate: "", docNumber: ""});
+  const [children, setChildren] = useState<Array<{firstName: string; lastName: string; birthDate: string; docNumber: string; teamId: string}>>([]);
+  const [currentChild, setCurrentChild] = useState({firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: ""});
   
   // Documentación
   const [docs, setDocs] = useState({
@@ -61,12 +71,12 @@ export function RegistrationFlow() {
   };
 
   const addChild = () => {
-    if (!currentChild.firstName || !currentChild.lastName || !currentChild.birthDate || !currentChild.docNumber) {
-      toast.error("Completa todos los datos del hijo");
+    if (!currentChild.firstName || !currentChild.lastName || !currentChild.birthDate || !currentChild.docNumber || !currentChild.teamId) {
+      toast.error("Completa todos los datos del hijo (incluido el equipo)");
       return;
     }
     setChildren([...children, currentChild]);
-    setCurrentChild({firstName: "", lastName: "", birthDate: "", docNumber: ""});
+    setCurrentChild({firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: ""});
     toast.success("Hijo agregado");
   };
 
@@ -193,15 +203,20 @@ export function RegistrationFlow() {
             family_id: familyId,
             full_name: `${child.firstName} ${child.lastName}`,
             birth_date: child.birthDate,
+            team_id: child.teamId || null,
           } as any);
         }
       }
 
       toast.success("Registro completado exitosamente");
-      setStep(1);
-      setAdult({firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "", phone: "", email: "", isResponsible: false});
-      setChildren([]);
-      setDocs({photo: "", dniFront: "", dniBack: "", signature: "", auth_image: false, auth_travel: false, auth_medical: false, auth_data_sharing: false});
+      if (onComplete) {
+        onComplete();
+      } else {
+        setStep(1);
+        setAdult({firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "", phone: "", email: "", isResponsible: false});
+        setChildren([]);
+        setDocs({photo: "", dniFront: "", dniBack: "", signature: "", auth_image: false, auth_travel: false, auth_medical: false, auth_data_sharing: false});
+      }
     } catch (err: any) {
       console.error("Error en registro:", err);
       toast.error(`Error: ${err.message}`);
@@ -304,15 +319,30 @@ export function RegistrationFlow() {
                   <Input value={currentChild.docNumber} onChange={(e) => handleChildChange("docNumber", e.target.value)} size={1} />
                 </div>
               </div>
+              <div>
+                <Label className="text-sm">Equipo</Label>
+                <Select value={currentChild.teamId} onValueChange={(v) => handleChildChange("teamId", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar equipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name} ({team.category})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button onClick={addChild} variant="outline" className="w-full">Agregar otro menor</Button>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Atrás</Button>
               <Button onClick={() => {
                 // Auto-agregar hijo actual si tiene datos pero no se pulsó "Agregar"
-                if (currentChild.firstName && currentChild.lastName && currentChild.birthDate && currentChild.docNumber && children.length === 0) {
+                if (currentChild.firstName && currentChild.lastName && currentChild.birthDate && currentChild.docNumber && currentChild.teamId && children.length === 0) {
                   setChildren([...children, currentChild]);
-                  setCurrentChild({firstName: "", lastName: "", birthDate: "", docNumber: ""});
+                  setCurrentChild({firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: ""});
                 }
                 setStep(3);
               }} className="flex-1">Siguiente</Button>

@@ -6,6 +6,7 @@ import { clubStore, useClub, currentUser } from "@/lib/clubStore";
 import { useAuth } from "@/lib/auth-context";
 import { useClubData } from "@/hooks/use-club-data";
 import { RegistrationFlow } from "@/components/club/RegistrationFlow";
+import { supabase } from "@/integrations/supabase/client";
 import { ValidationConsole } from "@/components/club/ValidationConsole";
 import { PaymentsAdmin, PaymentsParent } from "@/components/club/Payments";
 import { Attendance } from "@/components/club/Attendance";
@@ -59,6 +60,26 @@ function ClubApp() {
   const user = useClub(currentUser);
   const [view, setView] = useState<View>("inicio");
   const [navOpen, setNavOpen] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState<boolean | null>(null);
+
+  // Verificar si el usuario ya completó el registro federativo
+  useEffect(() => {
+    if (!auth.user || auth.role === "admin" || auth.role === "coach") {
+      setRegistrationComplete(true); // Admins y coaches no necesitan registro federativo
+      return;
+    }
+    const checkRegistration = async () => {
+      const { data, error } = await supabase
+        .from("registrations")
+        .select("id")
+        .eq("user_id", auth.user!.id)
+        .eq("type", "adult")
+        .limit(1);
+      if (error) { setRegistrationComplete(true); return; } // En caso de error, no bloquear
+      setRegistrationComplete(data && data.length > 0);
+    };
+    checkRegistration();
+  }, [auth.user, auth.role]);
 
   useEffect(() => {
     const onOpen = () => setView("chats");
@@ -96,6 +117,34 @@ function ClubApp() {
   };
 
   // Family role: show Netflix-style profile selector until a profile is chosen
+  // Si el usuario no ha completado el registro federativo, forzar RegistrationFlow
+  if ((auth.role === "family" || auth.role === "parent") && registrationComplete === false) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <Toaster theme="dark" position="top-center" />
+        <div className="mx-auto max-w-2xl px-4 py-8">
+          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
+            <h2 className="text-lg font-bold text-primary">Completa tu registro federativo</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Para acceder a tu panel de familia, primero debes completar tus datos personales y documentación.</p>
+          </div>
+          <RegistrationFlow onComplete={() => setRegistrationComplete(true)} />
+        </div>
+      </div>
+    );
+  }
+
+  // Si aún estamos verificando el registro, mostrar loading
+  if ((auth.role === "family" || auth.role === "parent") && registrationComplete === null) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground">Verificando registro...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (auth.role === "family" && !auth.activeProfile) {
     return (
       <div className="min-h-screen bg-background text-foreground">
