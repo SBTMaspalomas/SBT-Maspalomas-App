@@ -327,9 +327,9 @@ export function RegistrationFlow() {
                 </>
               )}
 
-              <div className="flex items-start space-x-2 p-2 bg-yellow-50 rounded border border-yellow-200">
+              <div className="flex items-start space-x-2 p-3 rounded border border-amber-500/50 bg-amber-500/10">
                 <Checkbox checked={docs.auth_data_sharing} onCheckedChange={(v) => handleDocChange("auth_data_sharing", v)} />
-                <Label className="text-sm font-semibold">Autorizo que se compartan nuestros datos personales con federaciones, seguros deportivos, entidades públicas de las que dependa nuestra actividad, compañías de transporte e instalaciones hoteleras en caso de viajes, y para cualquier otro uso legítimo requerido por el propio desarrollo de nuestra función esencial.</Label>
+                <Label className="text-sm font-semibold text-foreground">Autorizo que se compartan nuestros datos personales con federaciones, seguros deportivos, entidades públicas de las que dependa nuestra actividad, compañías de transporte e instalaciones hoteleras en caso de viajes, y para cualquier otro uso legítimo requerido por el propio desarrollo de nuestra función esencial.</Label>
               </div>
             </div>
 

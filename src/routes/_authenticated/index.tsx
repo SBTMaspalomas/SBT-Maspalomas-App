@@ -34,14 +34,14 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "jugadores" | "equipos" | "asignacion" | "convocatorias" | "mis-convocatorias";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "asignacion" | "convocatorias" | "mis-convocatorias";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family"] },
   { id: "mizona", label: "Mi zona", icon: Trophy, roles: ["player"] },
   { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent", "family"] },
   { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
-  { id: "jugadores", label: "Jugadores", icon: Users2, roles: ["admin"] },
+  { id: "miembros", label: "Miembros", icon: Users2, roles: ["admin"] },
   { id: "equipos", label: "Equipos", icon: Zap, roles: ["admin"] },
   { id: "asignacion", label: "Asignar Equipos", icon: Trophy, roles: ["admin"] },
   { id: "convocatorias", label: "Convocatorias", icon: ClipboardCheck, roles: ["admin", "coach"] },
@@ -50,7 +50,6 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family"] },
   { id: "asistencia", label: "Control de asistencia", icon: ClipboardCheck, roles: ["coach"] },
   { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player", "family"] },
-  { id: "roles", label: "Usuarios y roles", icon: Users, roles: ["admin"] },
 ];
 
 function ClubApp() {
@@ -184,7 +183,7 @@ function ClubApp() {
               {view === "mizona" && <PlayerView />}
               {view === "cartelera" && <NewsBoard />}
               {view === "registro" && <RegistrationFlow />}
-              {view === "jugadores" && auth.role === "admin" && <PlayersList />}
+              {view === "miembros" && auth.role === "admin" && <RoleManager />}
               {view === "equipos" && auth.role === "admin" && <TeamsManager />}
               {view === "asignacion" && auth.role === "admin" && <PlayerTeamAssignment />}
               {view === "convocatorias" && (auth.role === "admin" || auth.role === "coach") && <ConvocatoriesManager />}
@@ -194,7 +193,6 @@ function ClubApp() {
               {view === "pagos" && (auth.role === "parent" || auth.role === "family") && <PaymentsParent />}
               {view === "asistencia" && auth.role === "coach" && <Attendance />}
               {view === "chats" && <Chats />}
-              {view === "roles" && auth.role === "admin" && <RoleManager />}
             </>
           )}
         </main>
