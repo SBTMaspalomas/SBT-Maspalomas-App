@@ -182,7 +182,7 @@ export function RoleManager() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-black">Miembros Registrados</h2>
+          <h2 className="text-lg font-black">Gestión de Miembros Registrados</h2>
         </div>
         <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">{rows.length} total</span>
         <Button variant="outline" size="sm" className="ml-auto" onClick={load} disabled={loading}>
