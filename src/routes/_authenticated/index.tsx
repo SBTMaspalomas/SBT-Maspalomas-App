@@ -66,6 +66,29 @@ function ClubApp() {
     return () => window.removeEventListener("open-private-chat", onOpen as EventListener);
   }, []);
 
+  // Show loading state while auth is being resolved
+  if (auth.loading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If no role is set yet, show a fallback
+  if (!auth.role) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <p className="text-sm text-muted-foreground">No se pudo determinar tu rol. Intenta cerrar sesión y volver a entrar.</p>
+          <Button onClick={() => { auth.signOut(); navigate({ to: "/auth" }); }}>Cerrar sesión</Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleSignOut = async () => {
     await auth.signOut();
