@@ -273,7 +273,14 @@ export function RegistrationFlow() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Atrás</Button>
-              <Button onClick={() => setStep(3)} className="flex-1">Siguiente</Button>
+              <Button onClick={() => {
+                // Auto-agregar hijo actual si tiene datos pero no se pulsó "Agregar"
+                if (currentChild.firstName && currentChild.lastName && currentChild.birthDate && currentChild.docNumber && children.length === 0) {
+                  setChildren([...children, currentChild]);
+                  setCurrentChild({firstName: "", lastName: "", birthDate: "", docNumber: ""});
+                }
+                setStep(3);
+              }} className="flex-1">Siguiente</Button>
             </div>
           </CardContent>
         </Card>
@@ -302,8 +309,8 @@ export function RegistrationFlow() {
             {/* Autorizaciones */}
             <div className="space-y-3 p-3 bg-muted rounded">
               <p className="font-semibold text-sm">Autorizaciones</p>
-              
-              {adult.isResponsible && children.length > 0 && (
+             
+              {adult.isResponsible && (
                 <>
                   <div className="flex items-start space-x-2">
                     <Checkbox checked={docs.auth_image} onCheckedChange={(v) => handleDocChange("auth_image", v)} />
