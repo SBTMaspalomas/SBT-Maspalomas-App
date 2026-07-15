@@ -36,7 +36,7 @@ function PasswordInput({ id, value, onChange, minLength }: { id: string; value: 
 }
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Acceso · Club Hoops" }] }),
+  head: () => ({ meta: [{ title: "Acceso · SBT Maspalomas" }] }),
   component: AuthPage,
 });
 
@@ -109,9 +109,9 @@ function AuthPage() {
       <Toaster theme="dark" position="top-center" />
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground text-2xl">🏀</div>
-          <h1 className="text-2xl font-black uppercase tracking-wider">Club Hoops</h1>
-          <p className="text-sm text-muted-foreground">Acceso al panel del club</p>
+          <img src="https://kiifznmcpyvalupdtnrq.supabase.co/storage/v1/object/public/avatars/SBT%20logo-.png" alt="SBT Maspalomas" className="mx-auto h-16 w-16 rounded-full object-cover" />
+          <h1 className="text-2xl font-black uppercase tracking-wider">SBT Maspalomas</h1>
+          <p className="text-sm text-muted-foreground">El Baloncesto en el Sur · Gran Canaria</p>
         </div>
 
         {mode === "forgot" ? (
@@ -180,9 +180,6 @@ function AuthPage() {
           </>
         )}
 
-        <p className="text-center text-[11px] text-muted-foreground">
-          Para probar como administrador, regístrate con <code className="text-primary">admin@club.com</code>.
-        </p>
       </div>
     </div>
   );

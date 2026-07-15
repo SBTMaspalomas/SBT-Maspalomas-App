@@ -28,7 +28,7 @@ import {
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
-      { title: "Club Hoops · Gestión del Club" },
+      { title: "SBT Maspalomas · Gestión del Club" },
       { name: "description", content: "Plataforma móvil de gestión integral para club de baloncesto: registros federativos, cuotas, asistencia, chats y cartelera." },
     ],
   }),
@@ -186,12 +186,10 @@ function ClubApp() {
             {navOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground font-black">
-              🏀
-            </div>
+            <img src="https://kiifznmcpyvalupdtnrq.supabase.co/storage/v1/object/public/avatars/SBT%20logo-.png" alt="SBT Maspalomas" className="h-9 w-9 shrink-0 rounded-full object-cover" />
             <div className="min-w-0">
-              <div className="truncate text-sm font-black uppercase tracking-wider">Club Hoops</div>
-              <div className="truncate text-[11px] text-muted-foreground">Gestión integral</div>
+              <div className="truncate text-sm font-black uppercase tracking-wider">SBT Maspalomas</div>
+              <div className="truncate text-[11px] text-muted-foreground">El Baloncesto en el Sur · Gran Canaria</div>
             </div>
           </div>
           <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">

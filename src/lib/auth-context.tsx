@@ -13,6 +13,7 @@ export interface FamilyChild {
 export interface FamilyInfo {
   id: string;
   reference_code: string | null;
+  adult_pin: string | null;
   children: FamilyChild[];
 }
 
@@ -81,7 +82,7 @@ async function loadRoleAndProfile(userId: string) {
 async function loadFamily(userId: string): Promise<FamilyInfo | null> {
   const { data: fam } = await supabase
     .from("families_meta")
-    .select("id, reference_code")
+    .select("id, reference_code, adult_pin")
     .eq("head_profile_id", userId)
     .maybeSingle();
   if (!fam) return null;
@@ -93,6 +94,7 @@ async function loadFamily(userId: string): Promise<FamilyInfo | null> {
   return {
     id: fam.id,
     reference_code: fam.reference_code,
+    adult_pin: (fam as any).adult_pin ?? null,
     children: (kids ?? []) as FamilyChild[],
   };
 }
@@ -151,10 +153,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const selectAdult = useCallback((pin: string) => {
-    if (pin !== ADULT_PIN) return false;
+    const realPin = family?.adult_pin || ADULT_PIN;
+    if (pin !== realPin) return false;
     setActiveProfile({ kind: "adult" });
     return true;
-  }, []);
+  }, [family]);
   const selectChild = useCallback((childId: string) => {
     setActiveProfile({ kind: "child", childId });
   }, []);

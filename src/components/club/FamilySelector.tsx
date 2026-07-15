@@ -63,8 +63,8 @@ export function FamilySelector() {
                 <InputOTPSlot index={3} className="h-14 w-14 text-xl" />
               </InputOTPGroup>
             </InputOTP>
-          </div>
-          <p className="text-[11px] text-muted-foreground">PIN de prueba: <span className="font-mono font-bold">{ADULT_PIN}</span></p>
+         </div>
+          <p className="text-[11px] text-muted-foreground">Introduce tu PIN personal de 4 dígitos.</p>
         </div>
       </div>
     );
@@ -74,7 +74,7 @@ export function FamilySelector() {
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-background to-surface px-4 py-6 sm:py-10">
       <div className="mx-auto max-w-4xl space-y-8">
         <div className="text-center">
-          <div className="text-xs uppercase tracking-widest text-primary">Club Hoops</div>
+          <div className="text-xs uppercase tracking-widest text-primary">SBT Maspalomas</div>
           <h1 className="mt-1 text-3xl font-black sm:text-4xl">¿Quién está viendo?</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {auth.fullName ? `Cuenta: ${auth.fullName}` : "Selecciona un perfil"}

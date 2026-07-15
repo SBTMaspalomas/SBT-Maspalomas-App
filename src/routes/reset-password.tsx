@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast, Toaster } from "sonner";
 
 export const Route = createFileRoute("/reset-password")({
-  head: () => ({ meta: [{ title: "Nueva contraseña · Club Hoops" }] }),
+  head: () => ({ meta: [{ title: "Nueva contraseña · SBT Maspalomas" }] }),
   component: ResetPage,
 });
 

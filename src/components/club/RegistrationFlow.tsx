@@ -351,25 +351,37 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
         </Card>
       )}
 
-      {/* PASO 3/4: Documentación */}
+    {/* PASO 3/4: Documentación */}
       {step === 3 && (
         <Card>
           <CardHeader>
             <CardTitle>Documentación</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label className="mb-2 block">Foto del adulto</Label>
-              <FileButton label="Seleccionar foto" value={docs.photo} onChange={(name) => handleDocChange("photo", name)} accept="image/*" />
+            {/* Documentos del adulto */}
+            <div className="space-y-3 p-3 rounded-lg border border-border bg-surface">
+              <p className="text-sm font-bold text-primary">Documentos del adulto: {adult.firstName} {adult.lastName}</p>
+              <div>
+                <Label className="mb-2 block">Foto carnet</Label>
+                <FileButton label="Seleccionar foto" value={docs.photo} onChange={(name) => handleDocChange("photo", name)} accept="image/*" />
+              </div>
+              <div>
+                <Label className="mb-2 block">DNI - Anverso</Label>
+                <FileButton label="Seleccionar archivo" value={docs.dniFront} onChange={(name) => handleDocChange("dniFront", name)} accept="image/*" />
+              </div>
+              <div>
+                <Label className="mb-2 block">DNI - Reverso</Label>
+                <FileButton label="Seleccionar archivo" value={docs.dniBack} onChange={(name) => handleDocChange("dniBack", name)} accept="image/*" />
+              </div>
             </div>
-            <div>
-              <Label className="mb-2 block">DNI - Anverso</Label>
-              <FileButton label="Seleccionar archivo" value={docs.dniFront} onChange={(name) => handleDocChange("dniFront", name)} accept="image/*" />
-            </div>
-            <div>
-              <Label className="mb-2 block">DNI - Reverso</Label>
-              <FileButton label="Seleccionar archivo" value={docs.dniBack} onChange={(name) => handleDocChange("dniBack", name)} accept="image/*" />
-            </div>
+
+            {/* Documentos de cada hijo */}
+            {children.length > 0 && children.map((child, idx) => (
+              <div key={idx} className="space-y-3 p-3 rounded-lg border border-border bg-surface">
+                <p className="text-sm font-bold text-primary">Documentos del menor: {child.firstName} {child.lastName}</p>
+                <p className="text-xs text-muted-foreground">Los documentos de los menores se pueden aportar más adelante desde el panel de familia.</p>
+              </div>
+            ))}
 
             {/* Autorizaciones */}
             <div className="space-y-3 p-3 bg-muted rounded">

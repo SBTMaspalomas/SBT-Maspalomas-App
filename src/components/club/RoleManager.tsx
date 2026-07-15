@@ -305,7 +305,7 @@ export function RoleManager() {
                       <p className="text-xs text-muted-foreground">No hay jugadores en la base de datos.</p>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
-                        {players.map((p) => {
+                        {players.filter((p) => !p.family_id || p.family_id === u.familyId).map((p) => {
                           const mine = u.familyId && p.family_id === u.familyId;
                           const takenByOther = p.family_id && !mine;
                           return (
@@ -321,7 +321,7 @@ export function RoleManager() {
                               title={takenByOther ? "Ya vinculado a otra familia" : ""}
                             >
                               <Baby className="mr-1 inline h-3 w-3" />
-                              {p.full_name}{p.team_id && ` · ${p.team_id}`}
+                              {p.full_name}{p.team_id && ` · ${teams.find((t) => t.id === p.team_id)?.name ?? "Sin equipo"}`}
                             </button>
                           );
                         })}

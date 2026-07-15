@@ -6,12 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, Clock, FileText, Download, User, Users, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Download, User, Users, RefreshCw } from "lucide-react";
 
 interface Registration {
   id: string;
   user_id: string;
-  type: string; // 'adult' | 'minor'
+  type: string;
   full_name: string;
   doc_type: string;
   doc_number: string;
@@ -31,7 +31,14 @@ interface Registration {
   family_id: string | null;
   parent_registration_id: string | null;
   created_at: string;
+  photo_status: string | null;
+  dni_front_status: string | null;
+  dni_back_status: string | null;
+  signature_status: string | null;
 }
+
+type DocField = "photo_status" | "dni_front_status" | "dni_back_status" | "signature_status";
+type DocStatus = "pending" | "approved" | "rejected";
 
 const statusUI = {
   pending: { label: "Pendiente", cls: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30", icon: Clock },
@@ -40,12 +47,34 @@ const statusUI = {
 };
 const defaultStatus = { label: "Sin estado", cls: "bg-gray-500/10 text-gray-400 border-gray-500/30", icon: Clock };
 
+const DOC_LABELS: Record<DocField, string> = {
+  photo_status: "Foto",
+  dni_front_status: "DNI Anverso",
+  dni_back_status: "DNI Reverso",
+  signature_status: "Firma",
+};
+
+const DOC_URL_MAP: Record<DocField, keyof Registration> = {
+  photo_status: "photo_url",
+  dni_front_status: "dni_front_url",
+  dni_back_status: "dni_back_url",
+  signature_status: "signature_url",
+};
+
+function computeOverallStatus(reg: Registration): DocStatus {
+  const fields: DocField[] = ["photo_status", "dni_front_status", "dni_back_status", "signature_status"];
+  const statuses = fields.map((f) => reg[f] || "pending");
+  if (statuses.some((s) => s === "rejected")) return "rejected";
+  if (statuses.every((s) => s === "approved")) return "approved";
+  return "pending";
+}
+
 export function ValidationConsole() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savingField, setSavingField] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
 
   const selected = registrations.find((r) => r.id === openId);
@@ -53,7 +82,7 @@ export function ValidationConsole() {
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registrations" as any)
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -62,39 +91,71 @@ export function ValidationConsole() {
       setLoading(false);
       return;
     }
-    setRegistrations((data || []) as Registration[]);
+    setRegistrations((data || []) as unknown as Registration[]);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const updateStatus = async (id: string, status: "pending" | "approved" | "rejected", rejectReason?: string) => {
-    setSavingId(id);
+  const updateDocStatus = async (id: string, field: DocField, status: DocStatus, rejectReason?: string) => {
+    setSavingField(`${id}-${field}`);
+    const updateData: Record<string, any> = { [field]: status };
+    if (status === "rejected" && rejectReason) {
+      updateData.reject_reason = rejectReason;
+    }
     const { error } = await supabase
-      .from("registrations")
-      .update({
-        doc_status: status,
-        reject_reason: status === "rejected" ? rejectReason : null,
-      })
+      .from("registrations" as any)
+      .update(updateData)
       .eq("id", id);
 
     if (error) {
-      toast.error("Error al actualizar estado");
-      setSavingId(null);
+      toast.error("Error al actualizar estado del documento");
+      setSavingField(null);
       return;
     }
 
-    toast.success(`Estado actualizado a ${statusUI[status].label}`);
-    setSavingId(null);
-    setOpenId(null);
-    setReason("");
+    // Update overall doc_status
+    const reg = registrations.find((r) => r.id === id);
+    if (reg) {
+      const updated = { ...reg, [field]: status };
+      const overall = computeOverallStatus(updated);
+      await supabase
+        .from("registrations" as any)
+        .update({ doc_status: overall, ...(status !== "rejected" ? {} : { reject_reason: rejectReason || null }) })
+        .eq("id", id);
+    }
+
+    toast.success(`${DOC_LABELS[field]}: ${statusUI[status].label}`);
+    setSavingField(null);
     load();
   };
 
-  const filtered = filter === "all" ? registrations : registrations.filter((r) => r.doc_status === filter);
-  const pendingCount = registrations.filter((r) => r.doc_status === "pending").length;
-  const approvedCount = registrations.filter((r) => r.doc_status === "approved").length;
-  const rejectedCount = registrations.filter((r) => r.doc_status === "rejected").length;
+  const approveAll = async (id: string) => {
+    setSavingField(`${id}-all`);
+    const { error } = await supabase
+      .from("registrations" as any)
+      .update({
+        photo_status: "approved",
+        dni_front_status: "approved",
+        dni_back_status: "approved",
+        signature_status: "approved",
+        doc_status: "approved",
+        reject_reason: null,
+      })
+      .eq("id", id);
+    if (error) { toast.error("Error"); setSavingField(null); return; }
+    toast.success("Todos los documentos aprobados");
+    setSavingField(null);
+    setOpenId(null);
+    load();
+  };
+
+  const getOverall = (r: Registration): DocStatus => computeOverallStatus(r);
+
+  const filtered = filter === "all" ? registrations : registrations.filter((r) => getOverall(r) === filter);
+  const pendingCount = registrations.filter((r) => getOverall(r) === "pending").length;
+  const approvedCount = registrations.filter((r) => getOverall(r) === "approved").length;
+  const rejectedCount = registrations.filter((r) => getOverall(r) === "rejected").length;
 
   return (
     <div className="space-y-4">
@@ -108,26 +169,21 @@ export function ValidationConsole() {
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline" className={`cursor-pointer ${filter === "all" ? "bg-primary/10 text-primary border-primary" : ""}`} onClick={() => setFilter("all")}>
           Todos: {registrations.length}
         </Badge>
         <Badge variant="outline" className={`cursor-pointer ${filter === "pending" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" : ""}`} onClick={() => setFilter("pending")}>
-          <Clock className="h-3 w-3 mr-1" />
-          Pendientes: {pendingCount}
+          <Clock className="h-3 w-3 mr-1" /> Pendientes: {pendingCount}
         </Badge>
         <Badge variant="outline" className={`cursor-pointer ${filter === "approved" ? "bg-green-500/10 text-green-400 border-green-500/30" : ""}`} onClick={() => setFilter("approved")}>
-          <CheckCircle2 className="h-3 w-3 mr-1" />
-          Aprobados: {approvedCount}
+          <CheckCircle2 className="h-3 w-3 mr-1" /> Aprobados: {approvedCount}
         </Badge>
         <Badge variant="outline" className={`cursor-pointer ${filter === "rejected" ? "bg-red-500/10 text-red-400 border-red-500/30" : ""}`} onClick={() => setFilter("rejected")}>
-          <XCircle className="h-3 w-3 mr-1" />
-          Rechazados: {rejectedCount}
+          <XCircle className="h-3 w-3 mr-1" /> Rechazados: {rejectedCount}
         </Badge>
       </div>
 
-      {/* Registrations List */}
       <Card>
         <CardContent className="space-y-2 pt-6">
           {loading ? (
@@ -141,7 +197,8 @@ export function ValidationConsole() {
             </div>
           ) : (
             filtered.map((r) => {
-              const S = statusUI[r.doc_status as keyof typeof statusUI] || defaultStatus;
+              const overall = getOverall(r);
+              const S = statusUI[overall] || defaultStatus;
               const Icon = S.icon;
               const TypeIcon = r.type === "adult" ? User : Users;
               return (
@@ -160,8 +217,7 @@ export function ValidationConsole() {
                     </div>
                   </div>
                   <Badge variant="outline" className={`shrink-0 ${S.cls}`}>
-                    <Icon className="mr-1 h-3 w-3" />
-                    {S.label}
+                    <Icon className="mr-1 h-3 w-3" /> {S.label}
                   </Badge>
                 </button>
               );
@@ -170,7 +226,6 @@ export function ValidationConsole() {
         </CardContent>
       </Card>
 
-      {/* Detail Dialog */}
       <Dialog open={!!openId} onOpenChange={(o) => !o && setOpenId(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -178,119 +233,74 @@ export function ValidationConsole() {
           </DialogHeader>
           {selected && (
             <div className="space-y-4">
-              {/* Info */}
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Tipo de documento:</span>
-                  <p className="font-medium">{selected.doc_type || "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Número:</span>
-                  <p className="font-medium">{selected.doc_number || "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Fecha de nacimiento:</span>
-                  <p className="font-medium">{selected.birth_date ? new Date(selected.birth_date).toLocaleDateString("es-ES") : "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Registrado:</span>
-                  <p className="font-medium">{new Date(selected.created_at).toLocaleDateString("es-ES")}</p>
-                </div>
-                {selected.phone && (
-                  <div>
-                    <span className="text-muted-foreground">Teléfono:</span>
-                    <p className="font-medium">{selected.phone}</p>
-                  </div>
-                )}
-                {selected.email && (
-                  <div>
-                    <span className="text-muted-foreground">Email:</span>
-                    <p className="font-medium">{selected.email}</p>
-                  </div>
-                )}
+                <div><span className="text-muted-foreground">Documento:</span><p className="font-medium">{selected.doc_type} {selected.doc_number || "—"}</p></div>
+                <div><span className="text-muted-foreground">Nacimiento:</span><p className="font-medium">{selected.birth_date ? new Date(selected.birth_date).toLocaleDateString("es-ES") : "—"}</p></div>
+                {selected.phone && <div><span className="text-muted-foreground">Teléfono:</span><p className="font-medium">{selected.phone}</p></div>}
+                {selected.email && <div><span className="text-muted-foreground">Email:</span><p className="font-medium">{selected.email}</p></div>}
               </div>
 
-              {/* Autorizaciones */}
               <div className="space-y-1">
                 <h3 className="font-medium text-sm">Autorizaciones</h3>
                 <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div className={selected.auth_data_sharing ? "text-green-400" : "text-red-400"}>
-                    {selected.auth_data_sharing ? "✓" : "✗"} Compartir datos (obligatoria)
-                  </div>
-                  <div className={selected.auth_image ? "text-green-400" : "text-muted-foreground"}>
-                    {selected.auth_image ? "✓" : "✗"} Imagen
-                  </div>
-                  <div className={selected.auth_travel ? "text-green-400" : "text-muted-foreground"}>
-                    {selected.auth_travel ? "✓" : "✗"} Transporte
-                  </div>
-                  <div className={selected.auth_medical ? "text-green-400" : "text-muted-foreground"}>
-                    {selected.auth_medical ? "✓" : "✗"} Asistencia médica
-                  </div>
+                  <div className={selected.auth_data_sharing ? "text-green-400" : "text-red-400"}>{selected.auth_data_sharing ? "✓" : "✗"} Compartir datos</div>
+                  <div className={selected.auth_image ? "text-green-400" : "text-muted-foreground"}>{selected.auth_image ? "✓" : "✗"} Imagen</div>
+                  <div className={selected.auth_travel ? "text-green-400" : "text-muted-foreground"}>{selected.auth_travel ? "✓" : "✗"} Transporte</div>
+                  <div className={selected.auth_medical ? "text-green-400" : "text-muted-foreground"}>{selected.auth_medical ? "✓" : "✗"} Asistencia médica</div>
                 </div>
               </div>
 
-              {/* Documents Grid */}
-              <div className="space-y-2">
-                <h3 className="font-medium text-sm">Documentos</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {[
-                    ["Foto", selected.photo_url],
-                    ["DNI anverso", selected.dni_front_url],
-                    ["DNI reverso", selected.dni_back_url],
-                  ].map(([label, url]) => (
-                    <div key={label as string} className="rounded-lg border border-border bg-background p-2">
-                      <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">{label as string}</div>
-                      {url ? (
-                        <div className="relative group">
-                          <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted overflow-hidden">
-                            <img src={url as string} alt={label as string} className="w-full h-full object-cover rounded" />
+              <div className="space-y-3">
+                <h3 className="font-medium text-sm">Documentos (aprobación individual)</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(["photo_status", "dni_front_status", "dni_back_status", "signature_status"] as DocField[]).map((field) => {
+                    const url = selected[DOC_URL_MAP[field]] as string | null;
+                    const status = (selected[field] || "pending") as DocStatus;
+                    const S = statusUI[status] || defaultStatus;
+                    const SIcon = S.icon;
+                    const isSaving = savingField === `${selected.id}-${field}`;
+                    return (
+                      <div key={field} className="rounded-lg border border-border bg-background p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{DOC_LABELS[field]}</span>
+                          <Badge variant="outline" className={`text-[10px] ${S.cls}`}><SIcon className="mr-1 h-2.5 w-2.5" />{S.label}</Badge>
+                        </div>
+                        {url ? (
+                          <div className="relative group">
+                            <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted overflow-hidden">
+                              <img src={url} alt={DOC_LABELS[field]} className="w-full h-full object-cover rounded" />
+                            </div>
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition rounded">
+                              <Download className="h-4 w-4 text-white" />
+                            </a>
                           </div>
-                          <a href={url as string} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition rounded">
-                            <Download className="h-4 w-4 text-white" />
-                          </a>
+                        ) : (
+                          <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted text-muted-foreground text-xs">No aportado</div>
+                        )}
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-green-400 border-green-500/30 hover:bg-green-500/10" disabled={isSaving || status === "approved" || !url} onClick={() => updateDocStatus(selected.id, field, "approved")}>
+                            <CheckCircle2 className="mr-1 h-3 w-3" /> Aprobar
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] text-red-400 border-red-500/30 hover:bg-red-500/10" disabled={isSaving || status === "rejected" || !url} onClick={() => updateDocStatus(selected.id, field, "rejected", reason || "Documento no válido")}>
+                            <XCircle className="mr-1 h-3 w-3" /> Rechazar
+                          </Button>
                         </div>
-                      ) : (
-                        <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted text-muted-foreground text-xs">
-                          No aportado
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Signature */}
-              {selected.signature_url && (
-                <div>
-                  <h3 className="font-medium text-sm mb-2">Firma</h3>
-                  <img src={selected.signature_url} alt="firma" className="h-24 rounded border border-border bg-white p-1" />
-                </div>
-              )}
-
-              {/* Reject Reason */}
               <div className="space-y-2 rounded-lg border border-border bg-background p-3">
                 <div className="text-sm font-medium">Motivo del rechazo (si aplica)</div>
-                <Input
-                  placeholder="Ej: DNI ilegible, falta documento..."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
+                <Input placeholder="Ej: DNI ilegible, falta documento..." value={reason} onChange={(e) => setReason(e.target.value)} />
               </div>
 
-              {/* Action Buttons */}
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => updateStatus(selected.id, "pending")} disabled={savingId === selected.id}>
-                  <Clock className="mr-2 h-4 w-4" />
-                  Pendiente
+                <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => approveAll(selected.id)} disabled={!!savingField}>
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Aprobar todos
                 </Button>
-                <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(selected.id, "approved")} disabled={savingId === selected.id}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Aprobar
-                </Button>
-                <Button variant="destructive" onClick={() => updateStatus(selected.id, "rejected", reason || "Sin motivo especificado")} disabled={savingId === selected.id}>
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Rechazar
-                </Button>
+                <Button variant="outline" onClick={() => setOpenId(null)}>Cerrar</Button>
               </div>
             </div>
           )}
