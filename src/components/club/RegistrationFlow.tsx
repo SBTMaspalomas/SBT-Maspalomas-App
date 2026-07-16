@@ -206,6 +206,20 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
             team_id: child.teamId || null,
           } as any);
         }
+
+        // 6. Generar identificador automático de cuenta: Apellido.I-NN
+        const firstChild = children[0];
+        const apellido = firstChild.lastName.split(" ")[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const inicial = firstChild.firstName.charAt(0).toUpperCase();
+        // Buscar cuántas familias ya tienen un reference_code con este prefijo
+        const prefix = `${apellido}.${inicial}-`;
+        const { data: existing } = await supabase
+          .from("families_meta")
+          .select("reference_code")
+          .like("reference_code", `${prefix}%`);
+        const seq = (existing?.length ?? 0) + 1;
+        const refCode = `${prefix}${String(seq).padStart(2, "0")}`;
+        await supabase.from("families_meta").update({ reference_code: refCode } as any).eq("id", familyId);
       }
 
       toast.success("Registro completado exitosamente");

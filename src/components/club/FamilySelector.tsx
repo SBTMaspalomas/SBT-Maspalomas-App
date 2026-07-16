@@ -4,8 +4,9 @@ import { useClub } from "@/lib/clubStore";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
-import { UserCog, Baby, ShieldCheck, CalendarDays, ArrowLeft, LogOut, Trophy, Wallet } from "lucide-react";
+import { UserCog, Baby, ShieldCheck, CalendarDays, ArrowLeft, LogOut, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { AvatarUpload } from "./AvatarUpload";
 
 function initials(name: string) {
   return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
@@ -33,7 +34,7 @@ export function FamilySelector() {
       toast.success("Bienvenido, adulto responsable");
     } else {
       setPin("");
-      toast.error("PIN incorrecto. Prueba con 1234 (demo).");
+      toast.error("PIN incorrecto");
     }
   };
 
@@ -49,7 +50,7 @@ export function FamilySelector() {
           </div>
           <div>
             <h2 className="text-2xl font-black">Adultos Responsables</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Introduce el PIN de 4 dígitos para gestionar la familia.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Introduce el PIN de 4 dígitos para acceder.</p>
           </div>
           <div className="flex justify-center">
             <InputOTP
@@ -75,11 +76,17 @@ export function FamilySelector() {
       <div className="mx-auto max-w-4xl space-y-8">
         <div className="text-center">
           <div className="text-xs uppercase tracking-widest text-primary">SBT Maspalomas</div>
-          <h1 className="mt-1 text-3xl font-black sm:text-4xl">¿Quién está viendo?</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {auth.fullName ? `Cuenta: ${auth.fullName}` : "Selecciona un perfil"}
-            {family?.reference_code && <> · Familia <span className="font-mono font-semibold text-foreground">{family.reference_code}</span></>}
-          </p>
+          {family?.reference_code ? (
+            <>
+              <h1 className="mt-1 text-3xl font-black sm:text-4xl">Cuenta {family.reference_code}</h1>
+              <p className="mt-2 text-sm text-muted-foreground">Selecciona un perfil</p>
+            </>
+          ) : (
+            <>
+              <h1 className="mt-1 text-3xl font-black sm:text-4xl">¿Quién está viendo?</h1>
+              <p className="mt-2 text-sm text-muted-foreground">Selecciona un perfil</p>
+            </>
+          )}
         </div>
 
         <div className="mx-auto grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -101,7 +108,7 @@ export function FamilySelector() {
         </div>
 
         {/* Resumen de equipos y cuotas */}
-        <FamilyTeamsAndFees children={children} familyId={family?.id ?? null} />
+        <FamilyTeams children={children} />
 
         <FamilyAgenda children={children} />
 
@@ -139,6 +146,7 @@ function ProfileTile({
 function ChildTile({ child, onClick }: { child: FamilyChild; onClick: () => void }) {
   const age = ageFrom(child.birth_date);
   const [teamName, setTeamName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!child.team_id) return;
@@ -148,25 +156,43 @@ function ChildTile({ child, onClick }: { child: FamilyChild; onClick: () => void
       });
   }, [child.team_id]);
 
+  useEffect(() => {
+    supabase.from("players").select("avatar_url").eq("id", child.id).maybeSingle()
+      .then(({ data }) => {
+        if (data && (data as any).avatar_url) setAvatarUrl((data as any).avatar_url);
+      });
+  }, [child.id]);
+
   return (
-    <button onClick={onClick} className="group flex flex-col items-center gap-2 rounded-2xl p-3 transition-transform hover:-translate-y-1">
-      <div className="grid h-24 w-24 place-items-center rounded-2xl bg-gradient-to-br from-success/70 to-primary/60 text-primary-foreground shadow-lg ring-2 ring-transparent transition-all group-hover:ring-primary sm:h-28 sm:w-28">
-        <span className="text-2xl font-black sm:text-3xl">{initials(child.full_name)}</span>
+    <div className="group flex flex-col items-center gap-2 rounded-2xl p-3 transition-transform hover:-translate-y-1">
+      <div className="relative">
+        <button onClick={onClick} className="grid h-24 w-24 place-items-center rounded-2xl bg-gradient-to-br from-success/70 to-primary/60 text-primary-foreground shadow-lg ring-2 ring-transparent transition-all group-hover:ring-primary sm:h-28 sm:w-28 overflow-hidden">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={child.full_name} className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-2xl font-black sm:text-3xl">{initials(child.full_name)}</span>
+          )}
+        </button>
+        <AvatarUpload
+          currentUrl={avatarUrl}
+          entityId={child.id}
+          entityType="player"
+          onUploaded={(url) => setAvatarUrl(url)}
+        />
       </div>
-      <div className="text-center">
+      <button onClick={onClick} className="text-center">
         <div className="text-sm font-bold">{child.full_name}</div>
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
           {teamName ?? (child.team_id ? "Cargando..." : "SIN EQUIPO")}
         </div>
         {age !== null && <div className="text-[10px] text-muted-foreground">{age} años</div>}
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }
 
-function FamilyTeamsAndFees({ children, familyId }: { children: FamilyChild[]; familyId: string | null }) {
+function FamilyTeams({ children }: { children: FamilyChild[] }) {
   const [teams, setTeams] = useState<Array<{id: string; name: string; category: string}>>([]);
-  const [payments, setPayments] = useState<Array<{id: string; amount: number; period: string; paid: boolean; player_name: string}>>([]);
 
   useEffect(() => {
     // Cargar equipos de los hijos
@@ -175,26 +201,17 @@ function FamilyTeamsAndFees({ children, familyId }: { children: FamilyChild[]; f
       supabase.from("teams").select("id, name, category").in("id", teamIds)
         .then(({ data }) => { if (data) setTeams(data); });
     }
-    // Cargar cuotas de la familia
-    if (familyId) {
-      supabase.from("payments").select("id, amount, period, paid, player_name").eq("family_id", familyId).order("created_at", { ascending: false })
-        .then(({ data }) => { if (data) setPayments(data as any); });
-    }
-  }, [children, familyId]);
+  }, [children]);
 
   if (children.length === 0) return null;
 
-  const pendingPayments = payments.filter(p => !p.paid);
-  const totalPending = pendingPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-
   return (
     <div className="space-y-4">
-      {/* Equipos de los hijos */}
       {teams.length > 0 && (
         <div className="rounded-2xl border border-border bg-surface p-4">
           <div className="mb-3 flex items-center gap-2">
             <Trophy className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-black uppercase tracking-wide">Equipos de tus hijos</h3>
+            <h3 className="text-sm font-black uppercase tracking-wide">Equipos</h3>
           </div>
           <div className="space-y-2">
             {children.map((child) => {
@@ -215,39 +232,6 @@ function FamilyTeamsAndFees({ children, familyId }: { children: FamilyChild[]; f
           </div>
         </div>
       )}
-
-      {/* Cuotas pendientes */}
-      <div className="rounded-2xl border border-border bg-surface p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-black uppercase tracking-wide">Cuotas</h3>
-          {totalPending > 0 && (
-            <span className="ml-auto rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
-              {totalPending.toFixed(2)}€ pendiente
-            </span>
-          )}
-        </div>
-        {payments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay cuotas registradas aún.</p>
-        ) : (
-          <ul className="space-y-2">
-            {payments.slice(0, 5).map((p) => (
-              <li key={p.id} className="flex items-center justify-between rounded-lg border border-border bg-background p-3">
-                <div>
-                  <div className="text-sm font-medium">{p.period}</div>
-                  <div className="text-xs text-muted-foreground">{p.player_name}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold">{p.amount?.toFixed(2)}€</div>
-                  <div className={`text-[10px] font-semibold ${p.paid ? "text-success" : "text-destructive"}`}>
-                    {p.paid ? "Pagado" : "Pendiente"}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 }

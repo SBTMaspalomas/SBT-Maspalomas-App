@@ -101,14 +101,9 @@ function ClubApp() {
 
   // If no role is set yet, show a fallback
   if (!auth.role) {
-    return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <p className="text-sm text-muted-foreground">No se pudo determinar tu rol. Intenta cerrar sesión y volver a entrar.</p>
-          <Button onClick={() => { auth.signOut(); navigate({ to: "/auth" }); }}>Cerrar sesión</Button>
-        </div>
-      </div>
-    );
+    // Si no hay rol (ej: tras signOut desde panel adulto), redirigir a auth
+    navigate({ to: "/auth" });
+    return null;
   }
 
   const handleSignOut = async () => {
@@ -238,7 +233,7 @@ function ClubApp() {
             <div className="mb-1 font-semibold text-foreground">Sesión activa</div>
             {displayName} <span className="text-primary">· {roleLabel}</span>
             {auth.family?.reference_code && (
-              <div className="mt-1">Familia: <span className="font-mono font-semibold text-foreground">{auth.family.reference_code}</span></div>
+              <div className="mt-1">Cuenta: <span className="font-mono font-semibold text-foreground">{auth.family.reference_code}</span></div>
             )}
           </div>
         </aside>
@@ -285,22 +280,41 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
     paymentsDue: players.reduce((n, p) => n + p.payments.filter((x) => !x.paid).length, 0),
   };
 
+  // Para el panel de adultos responsables: mostrar bienvenida con identificador
+  const isAdultFamilyProfile = auth.role === "family" && auth.activeProfile?.kind === "adult";
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-elevated p-5">
-        <div className="text-xs uppercase tracking-widest text-primary">Bienvenido</div>
-        <h1 className="mt-1 text-2xl font-black">{displayName}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {role === "admin" && "Tienes control total: finanzas, validación documental, mensajería y cartelera."}
-          {role === "coach" && "Gestiona la asistencia de tus equipos y comunica con jugadores y padres."}
-          {(role === "parent" || role === "family") && "Consulta tus pagos, próximos partidos y chats del equipo."}
-          {role === "player" && "Consulta tu jornada, calendario, clasificación y noticias del club."}
-        </p>
-        {auth.family && (
-          <div className="mt-2 text-xs text-muted-foreground">
-            Familia registrada: <span className="font-mono font-semibold text-foreground">{auth.family.reference_code ?? "—"}</span>
-            {" · "}{auth.family.children.length} hijo/a{auth.family.children.length === 1 ? "" : "s"}
-          </div>
+        {isAdultFamilyProfile ? (
+          <>
+            <div className="text-xs uppercase tracking-widest text-primary">Panel de responsables</div>
+            <h1 className="mt-1 text-2xl font-black">
+              Bienvenidos responsables de {auth.family?.reference_code ?? "esta cuenta"}
+            </h1>
+            <div className="mt-3 space-y-2">
+              <div className="rounded-lg border border-border bg-background p-3">
+                <div className="text-sm font-semibold">{auth.fullName}</div>
+                <div className="text-xs text-muted-foreground">{auth.user?.email}</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-xs uppercase tracking-widest text-primary">Bienvenido</div>
+            <h1 className="mt-1 text-2xl font-black">{displayName}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {role === "admin" && "Tienes control total: finanzas, validación documental, mensajería y cartelera."}
+              {role === "coach" && "Gestiona la asistencia de tus equipos y comunica con jugadores y padres."}
+              {role === "player" && "Consulta tu jornada, calendario, clasificación y noticias del club."}
+            </p>
+            {auth.family && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                Cuenta: <span className="font-mono font-semibold text-foreground">{auth.family.reference_code ?? "—"}</span>
+                {" · "}{auth.family.children.length} hijo/a{auth.family.children.length === 1 ? "" : "s"}
+              </div>
+            )}
+          </>
         )}
       </div>
 
