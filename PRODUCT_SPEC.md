@@ -189,15 +189,29 @@ Consola de revisión de todos los `registrations`:
 Dos vistas según rol:
 
 **`PaymentsAdmin`** (admin):
+- **Configuración de cuotas** (`FeeSchedulesEditor` en `CuotaAnual.tsx`): editor de los importes y fechas límite de cada tipo de cuota (**Senior / Federado / Escuela**). Los valores se guardan en la tabla `fee_schedules` (upsert por `fee_type`); **no están hardcodeados**. Muestra el total a plazos calculado en vivo.
 - Estadísticas (total / pendientes / pagados / rechazados) y resumen de importes (total y pagado en €).
 - Lista de pagos (`payments`) cruzada con `players` y `teams`.
 - Diálogo de detalle con comprobante y acciones para marcar el pago como **pendiente / pagado / rechazado** (registra `paid_at`).
 
 **`PaymentsParent`** (parent/family):
+- **Tarjeta informativa "Cuota anual"** (`CuotaAnual.tsx`) al inicio del panel: muestra el esquema de importes y fechas límite (pago único en septiembre o tres plazos septiembre/noviembre/febrero) según el tipo de cuota —**Senior / Federado / Escuela**— del equipo principal de cada hijo/a. Los importes se leen de `fee_schedules` (hook `useFeeSchedules`, con respaldo a valores por defecto si la tabla no está disponible). Solo se presentan las cuotas de los equipos de los hijos/as (dedup por tipo); a un adulto sin hijos con equipo no se le muestra ninguna referencia. El tipo se deriva de la categoría del equipo con `feeTypeForCategory`.
 - Resumen "Al día" vs. pendientes y **deuda pendiente** calculada.
 - Tarjetas de importe (total / pagado / pendiente).
 - Lista de cuotas de la familia (`payments` filtrado por `family_id`).
 - **Subida de comprobante** por cuota pendiente (a Storage `player-docs/payments/...`) y visualización del comprobante subido.
+
+Importes iniciales (semilla de `fee_schedules`, editables por el administrador):
+
+| | Senior | Federado | Escuela |
+|---|---|---|---|
+| Pago único (15 Sep) | 120€ | 390€ | 245€ |
+| Tres pagos (15 Sep) | 50€ | 175€ | 100€ |
+| Tres pagos (15 Nov) | 50€ | 125€ | 90€ |
+| Tres pagos (15 Feb) | 50€ | 125€ | 90€ |
+| **Total a plazos** | **150€** | **425€** | **280€** |
+
+El pago único aplica un descuento sobre el total a plazos (Senior −30€, Federado −35€, Escuela −35€).
 
 ### 7.4 Equipos — `TeamsManager.tsx` (solo admin)
 
@@ -307,6 +321,7 @@ Tablas con **Row Level Security (RLS)** activada:
 | `private_messages` | Mensajes privados admin↔familia | Solo admin y familia receptora |
 | `registrations`* | Registros federativos (adulto/menor, docs, autorizaciones, estados por documento) | Usado por RegistrationFlow y ValidationConsole |
 | `payments`* | Cuotas y pagos (importe, periodo, estado, comprobante) | Admin gestiona; familia ve los suyos |
+| `fee_schedules` | Importes y fechas límite de cada tipo de cuota (senior/federado/escuela) | Admin edita; todos leen |
 | `convocatorias`* | Convocatorias de entreno/partido | Manager/Player |
 | `convocatoria_responses`* | Respuestas de jugadores a convocatorias | Manager/Player |
 
