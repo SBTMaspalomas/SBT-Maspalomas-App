@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Upload, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
-const FileButton = ({ label, value, onChange, accept = "image/*" }: { label: string; value?: string; onChange: (name: string) => void; accept?: string }) => (
+const FileButton = ({ label, value, onChange, accept = "image/*" }: { label: string; value?: string; onChange: (file: File) => void; accept?: string }) => (
   <label className="flex cursor-pointer items-center justify-between rounded-md border border-dashed border-border bg-surface px-3 py-2.5 text-sm hover:border-primary">
     <span className="flex items-center gap-2 text-muted-foreground">
       <Upload className="h-4 w-4" />
@@ -26,7 +26,7 @@ const FileButton = ({ label, value, onChange, accept = "image/*" }: { label: str
       className="hidden"
       onChange={(e) => {
         const f = e.target.files?.[0];
-        if (f) onChange(f.name);
+        if (f) onChange(f);
       }}
     />
   </label>
@@ -57,10 +57,33 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
   const [children, setChildren] = useState<Array<{firstName: string; lastName: string; birthDate: string; docNumber: string; teamId: string}>>([]);
   const [currentChild, setCurrentChild] = useState({firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: ""});
   
-  // Documentación
+  // Documentación (nombres para mostrar) + ficheros reales para subir
   const [docs, setDocs] = useState({
     photo: "", dniFront: "", dniBack: "", signature: "", auth_image: false, auth_travel: false, auth_medical: false, auth_data_sharing: false
   });
+  const [docFiles, setDocFiles] = useState<Record<string, File>>({});
+
+  const handleDocFile = (field: "photo" | "dniFront" | "dniBack", file: File) => {
+    setDocFiles(prev => ({ ...prev, [field]: file }));
+    setDocs(prev => ({ ...prev, [field]: file.name }));
+  };
+
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const goFromStep1 = () => {
+    if (!adult.firstName.trim() || !adult.lastName.trim()) {
+      toast.error("Nombre y apellidos son obligatorios");
+      return;
+    }
+    if (!adult.docNumber.trim()) {
+      toast.error("El número de documento es obligatorio");
+      return;
+    }
+    if (!emailRe.test(adult.email.trim())) {
+      toast.error("Introduce un email válido");
+      return;
+    }
+    setStep(adult.isResponsible ? 2 : 3);
+  };
 
   const handleAdultChange = (field: string, value: string | boolean) => {
     setAdult(prev => ({...prev, [field]: value}));
@@ -139,18 +162,15 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       };
 
       const fileMap: Record<string, string> = {};
-      const fileInputs = document.querySelectorAll('input[type="file"]');
       const filesToUpload = [
         { key: "photo", label: "foto" },
         { key: "dniFront", label: "dni_anverso" },
         { key: "dniBack", label: "dni_reverso" }
       ];
 
-      for (let i = 0; i < fileInputs.length && i < filesToUpload.length; i++) {
-        const input = fileInputs[i] as HTMLInputElement;
-        const file = input.files?.[0];
+      for (const { key, label } of filesToUpload) {
+        const file = docFiles[key];
         if (file) {
-          const { key, label } = filesToUpload[i];
           const fileName = `${Date.now()}_${label}_${file.name}`;
           fileMap[key] = await uploadFile(file, `${user.id}/${fileName}`);
         }
@@ -183,7 +203,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       if (adult.isResponsible && children.length > 0 && familyId) {
         for (const child of children) {
           // Insertar en registrations
-          await supabase.from("registrations").insert({
+          const { error: childRegErr } = await supabase.from("registrations").insert({
             user_id: user.id,
             type: "minor",
             full_name: `${child.firstName} ${child.lastName}`,
@@ -198,28 +218,18 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
             parent_registration_id: adultReg?.id || null,
             doc_status: "pending",
           });
+          if (childRegErr) throw childRegErr;
+
           // Insertar en players para gestión de equipos
-          await supabase.from("players").insert({
+          const { error: playerErr } = await supabase.from("players").insert({
             family_id: familyId,
             full_name: `${child.firstName} ${child.lastName}`,
             birth_date: child.birthDate,
             team_id: child.teamId || null,
           } as any);
+          if (playerErr) throw playerErr;
         }
 
-        // 6. Generar identificador automático de cuenta: Apellido.I-NN
-        const firstChild = children[0];
-        const apellido = firstChild.lastName.split(" ")[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const inicial = firstChild.firstName.charAt(0).toUpperCase();
-        // Buscar cuántas familias ya tienen un reference_code con este prefijo
-        const prefix = `${apellido}.${inicial}-`;
-        const { data: existing } = await supabase
-          .from("families_meta")
-          .select("reference_code")
-          .like("reference_code", `${prefix}%`);
-        const seq = (existing?.length ?? 0) + 1;
-        const refCode = `${prefix}${String(seq).padStart(2, "0")}`;
-        await supabase.from("families_meta").update({ reference_code: refCode } as any).eq("id", familyId);
       }
 
       toast.success("Registro completado exitosamente");
@@ -230,6 +240,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
         setAdult({firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "", phone: "", email: "", isResponsible: false});
         setChildren([]);
         setDocs({photo: "", dniFront: "", dniBack: "", signature: "", auth_image: false, auth_travel: false, auth_medical: false, auth_data_sharing: false});
+        setDocFiles({});
       }
     } catch (err: any) {
       console.error("Error en registro:", err);
@@ -294,7 +305,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
               <Checkbox checked={adult.isResponsible} onCheckedChange={(v) => handleAdultChange("isResponsible", v)} />
               <Label>Soy adulto responsable de un menor de edad</Label>
             </div>
-            <Button onClick={() => setStep(adult.isResponsible ? 2 : 3)} className="w-full">Siguiente</Button>
+            <Button onClick={goFromStep1} className="w-full">Siguiente</Button>
           </CardContent>
         </Card>
       )}
@@ -377,15 +388,15 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
               <p className="text-sm font-bold text-primary">Documentos del adulto: {adult.firstName} {adult.lastName}</p>
               <div>
                 <Label className="mb-2 block">Foto carnet</Label>
-                <FileButton label="Seleccionar foto" value={docs.photo} onChange={(name) => handleDocChange("photo", name)} accept="image/*" />
+                <FileButton label="Seleccionar foto" value={docs.photo} onChange={(file) => handleDocFile("photo", file)} accept="image/*" />
               </div>
               <div>
                 <Label className="mb-2 block">DNI - Anverso</Label>
-                <FileButton label="Seleccionar archivo" value={docs.dniFront} onChange={(name) => handleDocChange("dniFront", name)} accept="image/*" />
+                <FileButton label="Seleccionar archivo" value={docs.dniFront} onChange={(file) => handleDocFile("dniFront", file)} accept="image/*" />
               </div>
               <div>
                 <Label className="mb-2 block">DNI - Reverso</Label>
-                <FileButton label="Seleccionar archivo" value={docs.dniBack} onChange={(name) => handleDocChange("dniBack", name)} accept="image/*" />
+                <FileButton label="Seleccionar archivo" value={docs.dniBack} onChange={(file) => handleDocFile("dniBack", file)} accept="image/*" />
               </div>
             </div>
 

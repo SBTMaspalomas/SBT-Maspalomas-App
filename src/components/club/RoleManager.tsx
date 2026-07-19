@@ -119,8 +119,9 @@ export function RoleManager() {
 
   const changeRole = async (userId: string, newRole: Role) => {
     setSavingId(userId);
-    await supabase.from("user_roles").delete().eq("user_id", userId);
-    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" | "parent" | "player" });
+    const { error: delErr } = await supabase.from("user_roles").delete().eq("user_id", userId);
+    if (delErr) { toast.error("Error al actualizar rol"); setSavingId(null); return; }
+    const { error: insErr } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "coach" | "family" });
     if (insErr) { toast.error("Error al asignar rol"); setSavingId(null); return; }
     if (newRole !== "coach") await supabase.from("coach_teams").delete().eq("user_id", userId);
     toast.success(`Rol actualizado a ${ROLE_LABEL[newRole]}`);
@@ -198,7 +199,7 @@ export function RoleManager() {
         <div className="flex items-center gap-1.5 flex-wrap">
           <Filter className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs text-muted-foreground mr-1">Filtrar:</span>
-          {(["all", "admin", "coach", "parent", "family", "player"] as const).map((r) => (
+          {(["all", "admin", "coach", "family"] as const).map((r) => (
             <button
               key={r}
               onClick={() => setRoleFilter(r)}
@@ -242,7 +243,7 @@ export function RoleManager() {
                     "bg-surface-elevated text-muted-foreground"
                   }`}>{ROLE_LABEL[u.role]}</span>
                   <div className="flex w-full flex-wrap gap-1 sm:w-auto">
-                    {(["family", "player", "parent", "coach", "admin"] as Role[]).map((r) => (
+                    {(["family", "coach", "admin"] as Role[]).map((r) => (
                       <Button
                         key={r} size="sm"
                         variant={u.role === r ? "default" : "outline"}

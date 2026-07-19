@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,12 @@ interface PlayerResponse {
 }
 
 export function ConvocatoriesPlayer() {
+  const { activeProfile } = useAuth();
+  // Identidad del jugador: hoy el perfil de jugador se sirve como perfil de hijo dentro de
+  // una cuenta de familia (activeProfile.childId apunta a players.id). Sin ese perfil no se
+  // puede identificar al jugador, así que no se permite responder.
+  const playerId = activeProfile?.kind === "child" ? activeProfile.childId : null;
+
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [responses, setResponses] = useState<Map<string, PlayerResponse>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -36,36 +43,47 @@ export function ConvocatoriesPlayer() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    
+
     // Get convocatorias for player's team
-    const { data: convData } = await supabase
+    const { data: convData, error: convErr } = await supabase
       .from("convocatorias")
       .select("*")
       .order("date", { ascending: false });
+    if (convErr) console.error("ConvocatoriesPlayer: error cargando convocatorias", convErr);
 
-    // Get player's responses
-    const { data: respData } = await supabase
-      .from("convocatoria_responses")
-      .select("*");
+    // Get ONLY this player's responses
+    let respData: any[] = [];
+    if (playerId) {
+      const { data, error: respErr } = await supabase
+        .from("convocatoria_responses")
+        .select("*")
+        .eq("player_id", playerId);
+      if (respErr) console.error("ConvocatoriesPlayer: error cargando respuestas", respErr);
+      respData = data || [];
+    }
 
     setConvocatorias((convData || []) as Convocatoria[]);
-    
+
     const respMap = new Map<string, PlayerResponse>();
-    (respData || []).forEach((r: any) => {
+    respData.forEach((r: any) => {
       respMap.set(r.convocatoria_id, r);
     });
     setResponses(respMap);
     setLoading(false);
-  }, []);
+  }, [playerId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   const handleRespond = async (convId: string, status: "confirmed" | "problem") => {
+    if (!playerId) {
+      toast.error("No se pudo identificar al jugador");
+      return;
+    }
     const { error } = await supabase.from("convocatoria_responses").insert({
       convocatoria_id: convId,
-      player_id: "current_player_id", // TODO: Get from auth context
+      player_id: playerId,
       status,
       problem_type: status === "problem" ? problemType : null,
       notes: problemNotes || null,

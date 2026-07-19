@@ -143,7 +143,6 @@ export function PaymentsAdmin() {
             payments.map((payment) => {
               const config = statusConfig[payment.status];
               const Icon = config.icon;
-              const player = players.find((p) => p.id === payment.player_id);
 
               return (
                 <button
@@ -328,7 +327,7 @@ export function PaymentsParent() {
           <div>
             <div className="text-sm text-muted-foreground">Estado General</div>
             <div className="text-2xl font-bold mt-1">
-              {stats.paid === stats.total ? "✓ Al día" : `${stats.pending} pendientes`}
+              {stats.total > 0 && stats.paid === stats.total ? "✓ Al día" : `${stats.pending} pendientes`}
             </div>
           </div>
           <div className="text-right">

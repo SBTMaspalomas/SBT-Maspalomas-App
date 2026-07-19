@@ -15,7 +15,6 @@ import { NewsBoard } from "@/components/club/NewsBoard";
 import { RoleManager } from "@/components/club/RoleManager";
 import { PlayerView } from "@/components/club/PlayerView";
 import { FamilySelector } from "@/components/club/FamilySelector";
-import { PlayersList } from "@/components/club/PlayersList";
 import { TeamsManager } from "@/components/club/TeamsManager";
 import { PlayerTeamAssignment } from "@/components/club/PlayerTeamAssignment";
 import { ConvocatoriesManager } from "@/components/club/ConvocatoriesManager";
@@ -87,6 +86,14 @@ function ClubApp() {
     return () => window.removeEventListener("open-private-chat", onOpen as EventListener);
   }, []);
 
+  // Si no hay rol tras cargar (ej: tras signOut desde panel adulto), redirigir a auth.
+  // Debe hacerse en un efecto, no durante el render.
+  useEffect(() => {
+    if (!auth.loading && !auth.role) {
+      navigate({ to: "/auth" });
+    }
+  }, [auth.loading, auth.role, navigate]);
+
   // Show loading state while auth is being resolved
   if (auth.loading) {
     return (
@@ -99,10 +106,8 @@ function ClubApp() {
     );
   }
 
-  // If no role is set yet, show a fallback
+  // If no role is set yet, show a fallback while the redirect effect runs
   if (!auth.role) {
-    // Si no hay rol (ej: tras signOut desde panel adulto), redirigir a auth
-    navigate({ to: "/auth" });
     return null;
   }
 
@@ -157,12 +162,12 @@ function ClubApp() {
     : null;
 
   // Determine effective role for menu filtering (child profile behaves like 'player')
-  const effectiveRole: Role = isChildProfile ? "player" : (auth.role ?? user.role);
+  const effectiveRole: Role = isChildProfile ? "player" : (auth.role ?? user?.role ?? "family");
   const items = NAV.filter((n) => n.roles.includes(effectiveRole));
 
   const displayName = isChildProfile
     ? (activeChild?.full_name ?? "Jugador/a")
-    : (auth.fullName || auth.user?.email || user.name);
+    : (auth.fullName || auth.user?.email || user?.name || "Usuario");
   const roleLabel = isChildProfile
     ? "Perfil jugador/a"
     : auth.role === "admin" ? "Administrador"
@@ -271,7 +276,7 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
   const user = useClub(currentUser);
   const players = useClub((s) => s.players);
   const matches = useClub((s) => s.matches);
-  const displayName = auth.fullName || auth.user?.email || user.name;
+  const displayName = auth.fullName || auth.user?.email || user?.name || "Usuario";
   const role = effectiveRole;
   const stats = {
     pending: players.filter((p) => p.docStatus === "pending").length,

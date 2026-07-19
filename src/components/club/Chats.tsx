@@ -188,7 +188,10 @@ export function Chats() {
         setPrivateMsgs((data ?? []) as PrivateMsg[]);
         // Mark incoming as read (family reading admin msgs, or admin reading family msgs)
         const unread = (data ?? []).filter((m) => !m.is_read && m.sender_id !== user.id).map((m) => m.id);
-        if (unread.length) supabase.from("private_messages").update({ is_read: true }).in("id", unread).then(() => {});
+        if (unread.length) {
+          supabase.from("private_messages").update({ is_read: true }).in("id", unread)
+            .then(({ error }) => { if (error) console.error("Chats: error marcando mensajes como leídos", error); });
+        }
       } else {
         let q = supabase
           .from("team_messages")

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Calendar, MapPin, Users, Trash2, Eye } from "lucide-react";
+import { Plus, Calendar, MapPin, Users, Trash2 } from "lucide-react";
 
 interface Convocatoria {
   id: string;
@@ -32,13 +33,13 @@ interface ConvocatoriaResponse {
 }
 
 export function ConvocatoriesManager() {
+  const { user } = useAuth();
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [responses, setResponses] = useState<ConvocatoriaResponse[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [players, setPlayers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
-  const [selectedConvocatoria, setSelectedConvocatoria] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -48,7 +49,6 @@ export function ConvocatoriesManager() {
     time: "",
     location: "",
     notes: "",
-    selectedPlayers: [] as string[],
   });
 
   const loadData = useCallback(async () => {
@@ -81,6 +81,10 @@ export function ConvocatoriesManager() {
       toast.error("Completa todos los campos requeridos");
       return;
     }
+    if (!user) {
+      toast.error("Debes iniciar sesión");
+      return;
+    }
 
     const { error } = await supabase.from("convocatorias").insert({
       team_id: formData.team_id,
@@ -89,7 +93,7 @@ export function ConvocatoriesManager() {
       time: formData.time,
       location: formData.location,
       notes: formData.notes || null,
-      created_by: "current_user_id", // TODO: Get from auth context
+      created_by: user.id,
     });
 
     if (error) {
@@ -105,7 +109,6 @@ export function ConvocatoriesManager() {
       time: "",
       location: "",
       notes: "",
-      selectedPlayers: [],
     });
     setOpenDialog(false);
     loadData();
@@ -291,13 +294,6 @@ export function ConvocatoriesManager() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedConvocatoria(conv.id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
