@@ -83,11 +83,14 @@ sin pérdida de funcionalidad existente.
 
 Ejecuta y deja en verde, en este orden, antes de cerrar cualquier cambio:
 
+Gestor de paquetes oficial: **bun** (`bun.lock`). No reintroduzcas
+`package-lock.json` ni `pnpm-lock.yaml`.
+
 ```bash
-npm install                 # instala dependencias (o bun install / pnpm install)
-npx tsc -p tsconfig.json --noEmit   # comprobación de tipos TypeScript
-npm run lint                # ESLint (eslint .)
-npm run build               # build de producción (vite build) — debe compilar limpio
+bun install                 # instala dependencias
+bunx tsc -p tsconfig.json --noEmit   # comprobación de tipos TypeScript
+bun run lint                # ESLint (eslint .)
+bun run build               # build de producción (vite build) — debe compilar limpio
 ```
 
 Para cambios de base de datos revisa siempre `supabase/migrations/` y
