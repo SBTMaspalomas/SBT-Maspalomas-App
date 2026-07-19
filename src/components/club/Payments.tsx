@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Upload, Download, CheckCircle2, Clock, XCircle, DollarSign, FileText, Eye } from "lucide-react";
-import { CuotaAnual, feeTypeForCategory, type FeeType } from "./CuotaAnual";
+import { CuotaAnual, FeeSchedulesEditor, feeTypeForCategory, type FeeType } from "./CuotaAnual";
 
 interface Payment {
   id: string;
@@ -96,6 +96,9 @@ export function PaymentsAdmin() {
 
   return (
     <div className="space-y-4">
+      {/* Configuración de cuotas (editable por el administrador) */}
+      <FeeSchedulesEditor />
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Card className="p-3">
