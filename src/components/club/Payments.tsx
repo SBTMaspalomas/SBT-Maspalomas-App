@@ -5,9 +5,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Upload, Download, CheckCircle2, Clock, XCircle, DollarSign, FileText, Eye } from "lucide-react";
+import {
+  Upload,
+  Download,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  DollarSign,
+  FileText,
+  Eye,
+} from "lucide-react";
 
 interface Payment {
   id: string;
@@ -34,8 +49,16 @@ interface Team {
 }
 
 const statusConfig = {
-  pending: { label: "Pendiente", icon: Clock, color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  paid: { label: "Pagado", icon: CheckCircle2, color: "bg-green-50 text-green-700 border-green-200" },
+  pending: {
+    label: "Pendiente",
+    icon: Clock,
+    color: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  },
+  paid: {
+    label: "Pagado",
+    icon: CheckCircle2,
+    color: "bg-green-50 text-green-700 border-green-200",
+  },
   rejected: { label: "Rechazado", icon: XCircle, color: "bg-red-50 text-red-700 border-red-200" },
 };
 
@@ -67,7 +90,10 @@ export function PaymentsAdmin() {
     loadData();
   }, [loadData]);
 
-  const updatePaymentStatus = async (paymentId: string, status: "pending" | "paid" | "rejected") => {
+  const updatePaymentStatus = async (
+    paymentId: string,
+    status: "pending" | "paid" | "rejected",
+  ) => {
     const { error } = await supabase
       .from("payments")
       .update({ status, paid_at: status === "paid" ? new Date().toISOString() : null })
@@ -91,7 +117,9 @@ export function PaymentsAdmin() {
   };
 
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-  const paidAmount = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
+  const paidAmount = payments
+    .filter((p) => p.status === "paid")
+    .reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <div className="space-y-4">
@@ -138,7 +166,9 @@ export function PaymentsAdmin() {
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           ) : payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No hay pagos registrados</p>
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No hay pagos registrados
+            </p>
           ) : (
             payments.map((payment) => {
               const config = statusConfig[payment.status];
@@ -157,7 +187,9 @@ export function PaymentsAdmin() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{payment.player_name}</div>
-                      <div className="text-xs text-muted-foreground">{payment.period} · {payment.amount}€</div>
+                      <div className="text-xs text-muted-foreground">
+                        {payment.period} · {payment.amount}€
+                      </div>
                     </div>
                     <Badge variant="outline" className={config.color}>
                       <Icon className="h-3 w-3 mr-1" />
@@ -194,7 +226,9 @@ export function PaymentsAdmin() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">Fecha:</span>
-                  <p className="font-medium">{new Date(selectedPayment.created_at).toLocaleDateString("es-ES")}</p>
+                  <p className="font-medium">
+                    {new Date(selectedPayment.created_at).toLocaleDateString("es-ES")}
+                  </p>
                 </div>
               </div>
 
@@ -247,27 +281,26 @@ export function PaymentsAdmin() {
 }
 
 // ==================== PARENT/FAMILY DASHBOARD ====================
-export function PaymentsParent() {
+export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
   const { user, family } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const loadPayments = useCallback(async () => {
-    if (!family?.id) return;
+    // Familia: cuotas por family_id. Jugador SENIOR (sin familia): por player_id.
+    if (!family?.id && !playerId) return;
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("family_id", family.id)
-      .order("created_at", { ascending: false });
+    let query = supabase.from("payments").select("*").order("created_at", { ascending: false });
+    query = family?.id ? query.eq("family_id", family.id) : query.eq("player_id", playerId!);
+    const { data, error } = await query;
 
     if (!error) {
       setPayments((data || []) as Payment[]);
     }
     setLoading(false);
-  }, [family?.id]);
+  }, [family?.id, playerId]);
 
   useEffect(() => {
     loadPayments();
@@ -317,7 +350,9 @@ export function PaymentsParent() {
   };
 
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-  const paidAmount = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
+  const paidAmount = payments
+    .filter((p) => p.status === "paid")
+    .reduce((sum, p) => sum + p.amount, 0);
   const pendingAmount = totalAmount - paidAmount;
 
   return (
@@ -363,7 +398,9 @@ export function PaymentsParent() {
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           ) : payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No hay pagos pendientes</p>
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No hay pagos pendientes
+            </p>
           ) : (
             payments.map((payment) => {
               const config = statusConfig[payment.status];
@@ -374,7 +411,9 @@ export function PaymentsParent() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="font-medium text-sm">{payment.period}</div>
-                      <div className="text-xs text-muted-foreground mt-1">{payment.player_name}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {payment.player_name}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-sm">{payment.amount}€</div>

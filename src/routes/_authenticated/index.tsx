@@ -17,40 +17,101 @@ import { PlayerView } from "@/components/club/PlayerView";
 import { FamilySelector } from "@/components/club/FamilySelector";
 import { PlayersList } from "@/components/club/PlayersList";
 import { TeamsManager } from "@/components/club/TeamsManager";
-import { PlayerTeamAssignment } from "@/components/club/PlayerTeamAssignment";
 import { ConvocatoriesManager } from "@/components/club/ConvocatoriesManager";
 import { ConvocatoriesPlayer } from "@/components/club/ConvocatoriesPlayer";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap,
+  LayoutDashboard,
+  FileSignature,
+  ShieldCheck,
+  Wallet,
+  ClipboardCheck,
+  MessagesSquare,
+  Newspaper,
+  RefreshCw,
+  Menu,
+  X,
+  LogOut,
+  Users,
+  Trophy,
+  ArrowLeftRight,
+  Users2,
+  Zap,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "SBT Maspalomas · Gestión del Club" },
-      { name: "description", content: "Plataforma móvil de gestión integral para club de baloncesto: registros federativos, cuotas, asistencia, chats y cartelera." },
+      {
+        name: "description",
+        content:
+          "Plataforma móvil de gestión integral para club de baloncesto: registros federativos, cuotas, asistencia, chats y cartelera.",
+      },
     ],
   }),
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "asignacion" | "convocatorias" | "mis-convocatorias";
+type View =
+  | "inicio"
+  | "registro"
+  | "validacion"
+  | "pagos"
+  | "asistencia"
+  | "chats"
+  | "cartelera"
+  | "roles"
+  | "mizona"
+  | "miembros"
+  | "equipos"
+  | "convocatorias"
+  | "mis-convocatorias";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
-  { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family"] },
-  { id: "mizona", label: "Mi zona", icon: Trophy, roles: ["player"] },
-  { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent", "family"] },
-  { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
+  {
+    id: "inicio",
+    label: "Inicio",
+    icon: LayoutDashboard,
+    roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"],
+  },
+  // "Mi zona" pendiente de desarrollo — oculto hasta nueva orden.
+  { id: "mizona", label: "Mi zona", icon: Trophy, roles: [] },
+  {
+    id: "cartelera",
+    label: "Cartelera",
+    icon: Newspaper,
+    roles: ["admin", "coach", "parent", "family", "senior", "staff"],
+  },
+  {
+    id: "registro",
+    label: "Registro federativo",
+    icon: FileSignature,
+    roles: ["admin", "parent", "family"],
+  },
   { id: "miembros", label: "Miembros", icon: Users2, roles: ["admin"] },
   { id: "equipos", label: "Equipos", icon: Zap, roles: ["admin"] },
-  { id: "asignacion", label: "Asignar Equipos", icon: Trophy, roles: ["admin"] },
   { id: "convocatorias", label: "Convocatorias", icon: ClipboardCheck, roles: ["admin", "coach"] },
-  { id: "mis-convocatorias", label: "Mis Convocatorias", icon: ClipboardCheck, roles: ["player"] },
+  {
+    id: "mis-convocatorias",
+    label: "Mis Convocatorias",
+    icon: ClipboardCheck,
+    roles: ["player", "senior"],
+  },
   { id: "validacion", label: "Validación docs.", icon: ShieldCheck, roles: ["admin"] },
-  { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family"] },
+  {
+    id: "pagos",
+    label: "Cuotas y pagos",
+    icon: Wallet,
+    roles: ["admin", "parent", "family", "senior"],
+  },
   { id: "asistencia", label: "Control de asistencia", icon: ClipboardCheck, roles: ["coach"] },
-  { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player", "family"] },
+  {
+    id: "chats",
+    label: "Chats",
+    icon: MessagesSquare,
+    roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"],
+  },
 ];
 
 function ClubApp() {
@@ -75,7 +136,10 @@ function ClubApp() {
         .eq("user_id", auth.user!.id)
         .eq("type", "adult")
         .limit(1);
-      if (error) { setRegistrationComplete(true); return; } // En caso de error, no bloquear
+      if (error) {
+        setRegistrationComplete(true);
+        return;
+      } // En caso de error, no bloquear
       setRegistrationComplete(data && data.length > 0);
     };
     checkRegistration();
@@ -120,7 +184,10 @@ function ClubApp() {
         <div className="mx-auto max-w-2xl px-4 py-8">
           <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
             <h2 className="text-lg font-bold text-primary">Completa tu registro federativo</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Para acceder a tu panel de familia, primero debes completar tus datos personales y documentación.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Para acceder a tu panel de familia, primero debes completar tus datos personales y
+              documentación.
+            </p>
           </div>
           <RegistrationFlow onComplete={() => setRegistrationComplete(true)} />
         </div>
@@ -151,10 +218,10 @@ function ClubApp() {
 
   // Family + child profile → render PlayerView for that child
   const isChildProfile = auth.role === "family" && auth.activeProfile?.kind === "child";
-  const childId = isChildProfile && auth.activeProfile?.kind === "child" ? auth.activeProfile.childId : undefined;
-  const activeChild = childId && auth.family
-    ? auth.family.children.find((c) => c.id === childId) ?? null
-    : null;
+  const childId =
+    isChildProfile && auth.activeProfile?.kind === "child" ? auth.activeProfile.childId : undefined;
+  const activeChild =
+    childId && auth.family ? (auth.family.children.find((c) => c.id === childId) ?? null) : null;
 
   // Determine effective role for menu filtering (child profile behaves like 'player')
   const effectiveRole: Role = isChildProfile ? "player" : (auth.role ?? user.role);
@@ -162,14 +229,27 @@ function ClubApp() {
 
   const displayName = isChildProfile
     ? (activeChild?.full_name ?? "Jugador/a")
-    : (auth.fullName || auth.user?.email || user.name);
+    : auth.fullName || auth.user?.email || user.name;
   const roleLabel = isChildProfile
     ? "Perfil jugador/a"
-    : auth.role === "admin" ? "Administrador"
-    : auth.role === "coach" ? "Entrenador"
-    : auth.role === "family" ? "Adultos Responsables"
-    : "Usuario";
-  const initials = displayName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+    : auth.role === "admin"
+      ? "Administrador"
+      : auth.role === "coach"
+        ? "Entrenador"
+        : auth.role === "family"
+          ? "Adultos Responsables"
+          : auth.role === "senior"
+            ? "Jugador Senior"
+            : auth.role === "staff"
+              ? "Staff"
+              : "Usuario";
+  const initials = displayName
+    .split(" ")
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -177,30 +257,60 @@ function ClubApp() {
 
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
-          <button className="shrink-0 lg:hidden" onClick={() => setNavOpen((v) => !v)} aria-label="menu">
+          <button
+            className="shrink-0 lg:hidden"
+            onClick={() => setNavOpen((v) => !v)}
+            aria-label="menu"
+          >
             {navOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <img src="https://kiifznmcpyvalupdtnrq.supabase.co/storage/v1/object/public/avatars/SBT%20logo-.png" alt="SBT Maspalomas" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+            <img
+              src="https://kiifznmcpyvalupdtnrq.supabase.co/storage/v1/object/public/avatars/SBT%20logo-.png"
+              alt="SBT Maspalomas"
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
+            />
             <div className="min-w-0">
-              <div className="truncate text-sm font-black uppercase tracking-wider">SBT Maspalomas</div>
-              <div className="truncate text-[11px] text-muted-foreground">El Baloncesto en el Sur · Gran Canaria</div>
+              <div className="truncate text-sm font-black uppercase tracking-wider">
+                SBT Maspalomas
+              </div>
+              <div className="truncate text-[11px] text-muted-foreground">
+                El Baloncesto en el Sur · Gran Canaria
+              </div>
             </div>
           </div>
           <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5 sm:flex-initial">
-              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary text-xs font-bold">{initials || "U"}</div>
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary text-xs font-bold">
+                {initials || "U"}
+              </div>
               <div className="min-w-0 leading-tight">
                 <div className="truncate text-xs font-semibold">{displayName}</div>
                 <div className="truncate text-[10px] text-primary">{roleLabel}</div>
               </div>
             </div>
             {auth.role === "family" && (
-              <Button variant="outline" size="icon" onClick={() => { auth.clearProfile(); setView("inicio"); }} title="Cambiar de perfil">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  auth.clearProfile();
+                  setView("inicio");
+                }}
+                title="Cambiar de perfil"
+              >
                 <ArrowLeftRight className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="outline" size="icon" onClick={() => { clubStore.reset(); setView("inicio"); }} title="Reiniciar datos demo">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                clubStore.reset();
+                setView("inicio");
+              }}
+              title="Reiniciar datos demo"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="icon" onClick={handleSignOut} title="Cerrar sesión">
@@ -220,7 +330,10 @@ function ClubApp() {
               return (
                 <button
                   key={n.id}
-                  onClick={() => { setView(n.id); setNavOpen(false); }}
+                  onClick={() => {
+                    setView(n.id);
+                    setNavOpen(false);
+                  }}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${active ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-surface-elevated"}`}
                 >
                   <I className="h-4 w-4" />
@@ -233,7 +346,12 @@ function ClubApp() {
             <div className="mb-1 font-semibold text-foreground">Sesión activa</div>
             {displayName} <span className="text-primary">· {roleLabel}</span>
             {auth.family?.reference_code && (
-              <div className="mt-1">Cuenta: <span className="font-mono font-semibold text-foreground">{auth.family.reference_code}</span></div>
+              <div className="mt-1">
+                Cuenta:{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {auth.family.reference_code}
+                </span>
+              </div>
             )}
           </div>
         </aside>
@@ -241,7 +359,12 @@ function ClubApp() {
         {/* Main */}
         <main className="space-y-4">
           {isChildProfile ? (
-            <PlayerView childId={childId} />
+            <>
+              {(view === "inicio" || view === "mizona") && <PlayerView childId={childId} />}
+              {view === "mis-convocatorias" && <ConvocatoriesPlayer playerId={childId} />}
+              {view === "chats" && <Chats />}
+              {view === "cartelera" && <NewsBoard />}
+            </>
           ) : (
             <>
               {view === "inicio" && <Home setView={setView} effectiveRole={effectiveRole} />}
@@ -250,12 +373,21 @@ function ClubApp() {
               {view === "registro" && <RegistrationFlow />}
               {view === "miembros" && auth.role === "admin" && <RoleManager />}
               {view === "equipos" && auth.role === "admin" && <TeamsManager />}
-              {view === "asignacion" && auth.role === "admin" && <PlayerTeamAssignment />}
-              {view === "convocatorias" && (auth.role === "admin" || auth.role === "coach") && <ConvocatoriesManager />}
+              {view === "convocatorias" && (auth.role === "admin" || auth.role === "coach") && (
+                <ConvocatoriesManager />
+              )}
               {view === "mis-convocatorias" && auth.role === "player" && <ConvocatoriesPlayer />}
+              {view === "mis-convocatorias" && auth.role === "senior" && (
+                <ConvocatoriesPlayer playerId={auth.selfPlayerId ?? undefined} />
+              )}
               {view === "validacion" && auth.role === "admin" && <ValidationConsole />}
               {view === "pagos" && auth.role === "admin" && <PaymentsAdmin />}
-              {view === "pagos" && (auth.role === "parent" || auth.role === "family") && <PaymentsParent />}
+              {view === "pagos" && (auth.role === "parent" || auth.role === "family") && (
+                <PaymentsParent />
+              )}
+              {view === "pagos" && auth.role === "senior" && (
+                <PaymentsParent playerId={auth.selfPlayerId ?? undefined} />
+              )}
               {view === "asistencia" && auth.role === "coach" && <Attendance />}
               {view === "chats" && <Chats />}
             </>
@@ -288,7 +420,9 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
       <div className="rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-elevated p-5">
         {isAdultFamilyProfile ? (
           <>
-            <div className="text-xs uppercase tracking-widest text-primary">Panel de responsables</div>
+            <div className="text-xs uppercase tracking-widest text-primary">
+              Panel de responsables
+            </div>
             <h1 className="mt-1 text-2xl font-black">
               Bienvenidos responsables de {auth.family?.reference_code ?? "esta cuenta"}
             </h1>
@@ -304,14 +438,24 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
             <div className="text-xs uppercase tracking-widest text-primary">Bienvenido</div>
             <h1 className="mt-1 text-2xl font-black">{displayName}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {role === "admin" && "Tienes control total: finanzas, validación documental, mensajería y cartelera."}
-              {role === "coach" && "Gestiona la asistencia de tus equipos y comunica con jugadores y padres."}
-              {role === "player" && "Consulta tu jornada, calendario, clasificación y noticias del club."}
+              {role === "admin" &&
+                "Tienes control total: finanzas, validación documental, mensajería y cartelera."}
+              {role === "coach" &&
+                "Gestiona la asistencia de tus equipos y comunica con jugadores y padres."}
+              {role === "player" &&
+                "Consulta tu jornada, calendario, clasificación y noticias del club."}
+              {role === "senior" &&
+                "Consulta tus convocatorias, tu cuota y los chats de tus equipos."}
+              {role === "staff" && "Consulta la cartelera y los chats del club."}
             </p>
             {auth.family && (
               <div className="mt-2 text-xs text-muted-foreground">
-                Cuenta: <span className="font-mono font-semibold text-foreground">{auth.family.reference_code ?? "—"}</span>
-                {" · "}{auth.family.children.length} hijo/a{auth.family.children.length === 1 ? "" : "s"}
+                Cuenta:{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {auth.family.reference_code ?? "—"}
+                </span>
+                {" · "}
+                {auth.family.children.length} hijo/a{auth.family.children.length === 1 ? "" : "s"}
               </div>
             )}
           </>
@@ -328,18 +472,59 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <QuickAction onClick={() => setView("cartelera")} title="Próximos partidos" desc={`${matches.length} programados`} />
-        <QuickAction onClick={() => setView("chats")} title="Chats del club" desc="Equipo, padres y difusión" />
-        {role === "admin" && <QuickAction onClick={() => setView("validacion")} title="Validar documentos" desc={`${stats.pending} pendientes`} />}
-        {role === "coach" && <QuickAction onClick={() => setView("asistencia")} title="Control de asistencia" desc="Entreno y partido" />}
-        {(role === "parent" || role === "family") && <QuickAction onClick={() => setView("pagos")} title="Mis cuotas" desc="Estado y justificantes" />}
+        <QuickAction
+          onClick={() => setView("cartelera")}
+          title="Próximos partidos"
+          desc={`${matches.length} programados`}
+        />
+        <QuickAction
+          onClick={() => setView("chats")}
+          title="Chats del club"
+          desc="Equipo, padres y difusión"
+        />
+        {role === "admin" && (
+          <QuickAction
+            onClick={() => setView("validacion")}
+            title="Validar documentos"
+            desc={`${stats.pending} pendientes`}
+          />
+        )}
+        {role === "coach" && (
+          <QuickAction
+            onClick={() => setView("asistencia")}
+            title="Control de asistencia"
+            desc="Entreno y partido"
+          />
+        )}
+        {(role === "parent" || role === "family") && (
+          <QuickAction
+            onClick={() => setView("pagos")}
+            title="Mis cuotas"
+            desc="Estado y justificantes"
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "success" | "warning" | "destructive" }) {
-  const toneCls = tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : tone === "destructive" ? "text-destructive" : "text-primary";
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "success" | "warning" | "destructive";
+}) {
+  const toneCls =
+    tone === "success"
+      ? "text-success"
+      : tone === "warning"
+        ? "text-warning"
+        : tone === "destructive"
+          ? "text-destructive"
+          : "text-primary";
   return (
     <div className="rounded-xl border border-border bg-surface p-3">
       <div className={`text-3xl font-black ${toneCls}`}>{value}</div>
@@ -348,9 +533,20 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "su
   );
 }
 
-function QuickAction({ title, desc, onClick }: { title: string; desc: string; onClick: () => void }) {
+function QuickAction({
+  title,
+  desc,
+  onClick,
+}: {
+  title: string;
+  desc: string;
+  onClick: () => void;
+}) {
   return (
-    <button onClick={onClick} className="rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary hover:bg-surface-elevated">
+    <button
+      onClick={onClick}
+      className="rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary hover:bg-surface-elevated"
+    >
       <div className="font-semibold">{title}</div>
       <div className="text-xs text-muted-foreground">{desc}</div>
     </button>

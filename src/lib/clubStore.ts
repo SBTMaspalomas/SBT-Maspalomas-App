@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export type Role = "admin" | "coach" | "parent" | "player" | "family";
+export type Role = "admin" | "coach" | "parent" | "player" | "family" | "senior" | "staff";
 export type DocStatus = "pending" | "approved" | "rejected";
 
 export interface Team {
@@ -32,7 +32,15 @@ export interface Player {
   docStatus: DocStatus;
   rejectReason?: string;
   payments: { period: string; paid: boolean; receipt?: string }[];
-  attendance: Record<string, { training: boolean; match: boolean; status?: "present" | "late" | "absent"; absentReason?: "justified" | "unjustified" }>;
+  attendance: Record<
+    string,
+    {
+      training: boolean;
+      match: boolean;
+      status?: "present" | "late" | "absent";
+      absentReason?: "justified" | "unjustified";
+    }
+  >;
 }
 
 export interface User {
@@ -133,7 +141,9 @@ export function useClub<T>(selector: (s: ClubState) => T): T {
   return useSyncExternalStore(
     (cb) => {
       const unsub = clubStore.subscribe(cb);
-      return () => { unsub(); };
+      return () => {
+        unsub();
+      };
     },
     () => selector(clubStore.get()),
     () => selector(state),

@@ -3,7 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Calendar, MapPin, CheckCircle, AlertCircle, Clock } from "lucide-react";
 
@@ -26,7 +32,11 @@ interface PlayerResponse {
   notes?: string;
 }
 
-export function ConvocatoriesPlayer() {
+interface Props {
+  playerId?: string; // jugador activo (perfil hijo o SENIOR)
+}
+
+export function ConvocatoriesPlayer({ playerId }: Props = {}) {
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [responses, setResponses] = useState<Map<string, PlayerResponse>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -36,43 +46,63 @@ export function ConvocatoriesPlayer() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    
-    // Get convocatorias for player's team
-    const { data: convData } = await supabase
-      .from("convocatorias")
-      .select("*")
-      .order("date", { ascending: false });
 
-    // Get player's responses
-    const { data: respData } = await supabase
-      .from("convocatoria_responses")
-      .select("*");
+    // Determinar los equipos del jugador (equipo principal + player_teams).
+    let teamIds: string[] = [];
+    if (playerId) {
+      const [{ data: player }, { data: pTeams }] = await Promise.all([
+        supabase.from("players").select("team_id").eq("id", playerId).maybeSingle(),
+        supabase.from("player_teams").select("team_id").eq("player_id", playerId),
+      ]);
+      teamIds = [
+        ...(player?.team_id ? [player.team_id] : []),
+        ...(pTeams || []).map((t) => t.team_id),
+      ].filter(Boolean) as string[];
+    }
 
-    setConvocatorias((convData || []) as Convocatoria[]);
-    
+    // Convocatorias de los equipos del jugador (si conocemos sus equipos).
+    let convQuery = supabase.from("convocatorias").select("*").order("date", { ascending: false });
+    if (playerId && teamIds.length > 0) {
+      convQuery = convQuery.in("team_id", teamIds);
+    }
+    const { data: convData } = await convQuery;
+
+    // Respuestas del jugador activo.
+    let respQuery = supabase.from("convocatoria_responses").select("*");
+    if (playerId) {
+      respQuery = respQuery.eq("player_id", playerId);
+    }
+    const { data: respData } = await respQuery;
+
+    setConvocatorias((playerId && teamIds.length === 0 ? [] : convData || []) as Convocatoria[]);
+
     const respMap = new Map<string, PlayerResponse>();
     (respData || []).forEach((r: any) => {
       respMap.set(r.convocatoria_id, r);
     });
     setResponses(respMap);
     setLoading(false);
-  }, []);
+  }, [playerId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   const handleRespond = async (convId: string, status: "confirmed" | "problem") => {
+    if (!playerId) {
+      toast.error("No se ha podido identificar al jugador");
+      return;
+    }
     const { error } = await supabase.from("convocatoria_responses").insert({
       convocatoria_id: convId,
-      player_id: "current_player_id", // TODO: Get from auth context
+      player_id: playerId,
       status,
       problem_type: status === "problem" ? problemType : null,
       notes: problemNotes || null,
     });
 
     if (error) {
-      toast.error("Error al responder");
+      toast.error(`Error al responder: ${error.message}`);
       return;
     }
 
@@ -127,10 +157,17 @@ export function ConvocatoriesPlayer() {
           convocatorias.map((conv) => {
             const response = responses.get(conv.id);
             const date = new Date(conv.date);
-            const dateStr = date.toLocaleDateString("es-ES", { weekday: "short", month: "short", day: "numeric" });
+            const dateStr = date.toLocaleDateString("es-ES", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            });
 
             return (
-              <Card key={conv.id} className={`p-4 ${response ? "border-primary/30 bg-primary/5" : ""}`}>
+              <Card
+                key={conv.id}
+                className={`p-4 ${response ? "border-primary/30 bg-primary/5" : ""}`}
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -140,7 +177,9 @@ export function ConvocatoriesPlayer() {
                       {response && (
                         <div className="flex items-center gap-1">
                           {getStatusIcon(response.status)}
-                          <span className="text-xs font-medium">{getStatusLabel(response.status)}</span>
+                          <span className="text-xs font-medium">
+                            {getStatusLabel(response.status)}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -180,8 +219,12 @@ export function ConvocatoriesPlayer() {
                         </DialogHeader>
                         <div className="space-y-4">
                           <div className="text-sm">
-                            <p className="font-medium mb-1">{conv.type === "match" ? "Partido" : "Entrenamiento"}</p>
-                            <p className="text-muted-foreground">{dateStr} a las {conv.time}</p>
+                            <p className="font-medium mb-1">
+                              {conv.type === "match" ? "Partido" : "Entrenamiento"}
+                            </p>
+                            <p className="text-muted-foreground">
+                              {dateStr} a las {conv.time}
+                            </p>
                             <p className="text-muted-foreground">{conv.location}</p>
                           </div>
 

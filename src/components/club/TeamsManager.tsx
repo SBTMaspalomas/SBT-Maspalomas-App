@@ -1,11 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Edit2, Trash2, Users, Trophy, RefreshCw } from "lucide-react";
+import { Plus, Edit2, Trash2, Users, Trophy, RefreshCw, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { PlayerTeamAssignment } from "@/components/club/PlayerTeamAssignment";
 
 interface Team {
   id: string;
@@ -24,6 +31,7 @@ export function TeamsManager() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: "", category: "" });
 
@@ -38,7 +46,9 @@ export function TeamsManager() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSubmit = async () => {
     if (!formData.name.trim() || !formData.category.trim()) {
@@ -47,18 +57,27 @@ export function TeamsManager() {
     }
 
     if (editingId) {
-      const { error } = await supabase.from("teams").update({
-        name: formData.name.trim(),
-        category: formData.category.trim(),
-      }).eq("id", editingId);
-      if (error) { toast.error("Error al actualizar equipo"); return; }
+      const { error } = await supabase
+        .from("teams")
+        .update({
+          name: formData.name.trim(),
+          category: formData.category.trim(),
+        })
+        .eq("id", editingId);
+      if (error) {
+        toast.error("Error al actualizar equipo");
+        return;
+      }
       toast.success("Equipo actualizado");
     } else {
       const { error } = await supabase.from("teams").insert({
         name: formData.name.trim(),
         category: formData.category.trim(),
       });
-      if (error) { toast.error("Error al crear equipo"); return; }
+      if (error) {
+        toast.error("Error al crear equipo");
+        return;
+      }
       toast.success("Equipo creado");
     }
 
@@ -77,7 +96,10 @@ export function TeamsManager() {
   const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar este equipo?")) return;
     const { error } = await supabase.from("teams").delete().eq("id", id);
-    if (error) { toast.error("Error al eliminar equipo"); return; }
+    if (error) {
+      toast.error("Error al eliminar equipo");
+      return;
+    }
     toast.success("Equipo eliminado");
     load();
   };
@@ -96,15 +118,37 @@ export function TeamsManager() {
             <Trophy className="h-5 w-5 text-primary" />
             Equipos
           </h2>
-          <p className="text-sm text-muted-foreground">{teams.length} equipo{teams.length !== 1 ? "s" : ""} registrado{teams.length !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-muted-foreground">
+            {teams.length} equipo{teams.length !== 1 ? "s" : ""} registrado
+            {teams.length !== 1 ? "s" : ""}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
+          <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <ArrowLeftRight className="h-4 w-4 mr-2" />
+                Asignar equipo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Asignar equipos a jugadores</DialogTitle>
+              </DialogHeader>
+              <PlayerTeamAssignment onChanged={load} />
+            </DialogContent>
+          </Dialog>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => { setEditingId(null); setFormData({ name: "", category: "" }); }}>
+              <Button
+                onClick={() => {
+                  setEditingId(null);
+                  setFormData({ name: "", category: "" });
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo equipo
               </Button>
@@ -134,9 +178,7 @@ export function TeamsManager() {
                   <Button variant="outline" onClick={handleClose}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleSubmit}>
-                    {editingId ? "Actualizar" : "Crear"}
-                  </Button>
+                  <Button onClick={handleSubmit}>{editingId ? "Actualizar" : "Crear"}</Button>
                 </div>
               </div>
             </DialogContent>

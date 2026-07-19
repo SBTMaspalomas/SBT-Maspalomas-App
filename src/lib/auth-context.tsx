@@ -17,18 +17,18 @@ export interface FamilyInfo {
   children: FamilyChild[];
 }
 
-export type ActiveProfile =
-  | { kind: "adult" }
-  | { kind: "child"; childId: string };
+export type ActiveProfile = { kind: "adult" } | { kind: "child"; childId: string };
 
 interface AuthCtx {
   session: Session | null;
   user: User | null;
   role: Role | null;
+  roles: Role[];
   fullName: string | null;
   loading: boolean;
   family: FamilyInfo | null;
   activeProfile: ActiveProfile | null;
+  selfPlayerId: string | null;
   selectAdult: (pin: string) => boolean;
   selectChild: (childId: string) => void;
   clearProfile: () => void;
@@ -36,9 +36,18 @@ interface AuthCtx {
 }
 
 const Ctx = createContext<AuthCtx>({
-  session: null, user: null, role: null, fullName: null, loading: true,
-  family: null, activeProfile: null,
-  selectAdult: () => false, selectChild: () => {}, clearProfile: () => {},
+  session: null,
+  user: null,
+  role: null,
+  roles: [],
+  fullName: null,
+  loading: true,
+  family: null,
+  activeProfile: null,
+  selfPlayerId: null,
+  selectAdult: () => false,
+  selectChild: () => {},
+  clearProfile: () => {},
   signOut: async () => {},
 });
 
@@ -52,6 +61,8 @@ const DEMO_USER_BY_ROLE: Record<Role, string> = {
   parent: "u-parent1",
   player: "u-player1",
   family: "u-parent1",
+  senior: "u-player1",
+  staff: "u-coach1",
 };
 
 async function loadRoleAndProfile(userId: string) {
@@ -60,20 +71,25 @@ async function loadRoleAndProfile(userId: string) {
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
     supabase.from("coach_teams").select("team_id").eq("user_id", userId),
   ]);
-  
-  // Priorizar admin > coach > parent > player > family
+
+  const roles = (roleRows ?? []).map((r) => r.role as Role);
+  // Rol principal por prioridad. Un adulto puede tener varios roles; ADULTO
+  // RESPONSABLE (family) manda sobre SENIOR/STAFF cuando coexisten.
   let role: Role = "family";
-  if (roleRows && roleRows.length > 0) {
-    const roles = roleRows.map((r) => r.role);
+  if (roles.length > 0) {
     if (roles.includes("admin")) role = "admin";
     else if (roles.includes("coach")) role = "coach";
+    else if (roles.includes("family")) role = "family";
+    else if (roles.includes("senior")) role = "senior";
+    else if (roles.includes("staff")) role = "staff";
     else if (roles.includes("parent")) role = "parent";
     else if (roles.includes("player")) role = "player";
-    else role = roles[0] as Role;
+    else role = roles[0];
   }
-  
+
   return {
     role,
+    roles,
     fullName: profile?.full_name ?? null,
     teamIds: (teamRows ?? []).map((r) => r.team_id),
   };
@@ -102,9 +118,11 @@ async function loadFamily(userId: string): Promise<FamilyInfo | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<Role | null>(null);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [fullName, setFullName] = useState<string | null>(null);
   const [family, setFamily] = useState<FamilyInfo | null>(null);
   const [activeProfile, setActiveProfile] = useState<ActiveProfile | null>(null);
+  const [selfPlayerId, setSelfPlayerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -113,13 +131,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const apply = async (s: Session | null) => {
       setSession(s);
       if (!s?.user) {
-        setRole(null); setFullName(null); setFamily(null); setActiveProfile(null);
+        setRole(null);
+        setRoles([]);
+        setFullName(null);
+        setFamily(null);
+        setActiveProfile(null);
+        setSelfPlayerId(null);
         setLoading(false);
         return;
       }
-      const { role: r, fullName: fn, teamIds } = await loadRoleAndProfile(s.user.id);
+      const { role: r, roles: rs, fullName: fn, teamIds } = await loadRoleAndProfile(s.user.id);
       if (!active) return;
       setRole(r);
+      setRoles(rs);
       setFullName(fn ?? s.user.email ?? null);
 
       if (r === "family") {
@@ -131,6 +155,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setFamily(null);
         setActiveProfile({ kind: "adult" });
+      }
+
+      // Ficha de jugador propia (caso SENIOR: adulto que además es jugador).
+      if (rs.includes("senior")) {
+        const { data: selfPlayer } = await supabase
+          .from("players")
+          .select("id")
+          .eq("user_id", s.user.id)
+          .maybeSingle();
+        if (!active) return;
+        setSelfPlayerId(selfPlayer?.id ?? null);
+      } else {
+        setSelfPlayerId(null);
       }
 
       // Bridge to demo store for legacy views
@@ -149,15 +186,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setTimeout(() => apply(s), 0);
     });
-    return () => { active = false; sub.subscription.unsubscribe(); };
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
-  const selectAdult = useCallback((pin: string) => {
-    const realPin = family?.adult_pin || ADULT_PIN;
-    if (pin !== realPin) return false;
-    setActiveProfile({ kind: "adult" });
-    return true;
-  }, [family]);
+  const selectAdult = useCallback(
+    (pin: string) => {
+      const realPin = family?.adult_pin || ADULT_PIN;
+      if (pin !== realPin) return false;
+      setActiveProfile({ kind: "adult" });
+      return true;
+    },
+    [family],
+  );
   const selectChild = useCallback((childId: string) => {
     setActiveProfile({ kind: "child", childId });
   }, []);
@@ -169,10 +212,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{
-      session, user: session?.user ?? null, role, fullName, loading,
-      family, activeProfile, selectAdult, selectChild, clearProfile, signOut,
-    }}>
+    <Ctx.Provider
+      value={{
+        session,
+        user: session?.user ?? null,
+        role,
+        roles,
+        fullName,
+        loading,
+        family,
+        activeProfile,
+        selfPlayerId,
+        selectAdult,
+        selectChild,
+        clearProfile,
+        signOut,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );
