@@ -194,10 +194,23 @@ Dos vistas según rol:
 - Diálogo de detalle con comprobante y acciones para marcar el pago como **pendiente / pagado / rechazado** (registra `paid_at`).
 
 **`PaymentsParent`** (parent/family):
+- **Tarjeta informativa "Cuota anual"** (`CuotaAnual.tsx`) al inicio del panel: muestra el esquema de importes y fechas límite (pago único en septiembre o tres plazos septiembre/noviembre/febrero) según el tipo de cuota —**Senior / Federado / Escuela**— del equipo principal de cada hijo/a. Solo se presentan las cuotas de los equipos de los hijos/as (dedup por tipo); a un adulto sin hijos con equipo no se le muestra ninguna referencia. El tipo se deriva de la categoría del equipo con `feeTypeForCategory`.
 - Resumen "Al día" vs. pendientes y **deuda pendiente** calculada.
 - Tarjetas de importe (total / pagado / pendiente).
 - Lista de cuotas de la familia (`payments` filtrado por `family_id`).
 - **Subida de comprobante** por cuota pendiente (a Storage `player-docs/payments/...`) y visualización del comprobante subido.
+
+Importes vigentes de la cuota anual:
+
+| | Senior | Federado | Escuela |
+|---|---|---|---|
+| Pago único (15 Sep) | 120€ | 390€ | 245€ |
+| Tres pagos (15 Sep) | 50€ | 175€ | 100€ |
+| Tres pagos (15 Nov) | 50€ | 125€ | 90€ |
+| Tres pagos (15 Feb) | 50€ | 125€ | 90€ |
+| **Total a plazos** | **150€** | **425€** | **280€** |
+
+El pago único aplica un descuento sobre el total a plazos (Senior −30€, Federado −35€, Escuela −35€).
 
 ### 7.4 Equipos — `TeamsManager.tsx` (solo admin)
 
