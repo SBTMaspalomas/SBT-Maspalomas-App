@@ -11,8 +11,10 @@ export function useClubData() {
 
     const loadData = async () => {
       // Cargar equipos
-      const { data: teams } = await supabase.from("teams").select("*");
-      if (teams) {
+      const { data: teams, error: teamsError } = await supabase.from("teams").select("*");
+      if (teamsError) {
+        console.error("useClubData: error cargando equipos", teamsError);
+      } else if (teams) {
         clubStore.set((s) => {
           s.teams = teams.map(t => ({
             id: t.id,
@@ -25,39 +27,50 @@ export function useClubData() {
 
       // Cargar jugadores si es admin o coach
       if (role === "admin" || role === "coach") {
-        const { data: players } = await supabase.from("players").select("*");
-        if (players) {
+        const { data: players, error: playersError } = await supabase.from("players").select("*");
+        if (playersError) {
+          console.error("useClubData: error cargando jugadores", playersError);
+        } else if (players) {
           clubStore.set((s) => {
-            s.players = players.map(p => ({
-              id: p.id,
-              firstName: p.full_name.split(" ")[0],
-              lastName: p.full_name.split(" ").slice(1).join(" "),
-              birthDate: p.birth_date || "",
-              docType: "DNI",
-              docNumber: (p as any).id_card_number || "",
-              teamId: p.team_id || "",
-              parentId: p.family_id || "",
-              auth_image: true,
-              auth_travel: true,
-              auth_medical: true,
-              docStatus: "approved",
-              payments: [],
-              attendance: {}
-            }));
+            s.players = players.map(p => {
+              const fullName = p.full_name ?? "";
+              const parts = fullName.split(" ");
+              return {
+                id: p.id,
+                firstName: parts[0] ?? "",
+                lastName: parts.slice(1).join(" "),
+                birthDate: p.birth_date || "",
+                docType: "DNI",
+                docNumber: (p as any).id_card_number || "",
+                teamId: p.team_id || "",
+                parentId: p.family_id || "",
+                auth_image: true,
+                auth_travel: true,
+                auth_medical: true,
+                docStatus: "approved",
+                payments: [],
+                attendance: {}
+              };
+            });
           });
         }
       }
 
       // Cargar anuncios/eventos
-      const { data: events } = await supabase.from("club_events").select("*");
-      if (events) {
+      const { data: events, error: eventsError } = await supabase.from("club_events").select("*");
+      if (eventsError) {
+        console.error("useClubData: error cargando eventos", eventsError);
+      } else if (events) {
         clubStore.set((s) => {
-          s.announcements = events.map(e => ({
-            id: e.id,
-            title: e.title,
-            body: e.description || "",
-            at: new Date(e.event_date).getTime()
-          }));
+          s.announcements = events.map(e => {
+            const ts = e.event_date ? new Date(e.event_date).getTime() : Date.now();
+            return {
+              id: e.id,
+              title: e.title,
+              body: e.description || "",
+              at: Number.isNaN(ts) ? Date.now() : ts
+            };
+          });
         });
       }
     };

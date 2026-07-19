@@ -30,9 +30,18 @@ export function PlayerView({ childId }: Props = {}) {
     const load = async () => {
       setLoading(true);
       const teamText = child?.team_id ?? null;
+
+      // Resolver el UUID del equipo (team_id puede ser un UUID o un nombre) para poder
+      // filtrar standings.team_id (UUID) sin lanzar 22P02.
+      let teamUuid: string | null = null;
+      if (teamText) {
+        const { data: teamsData } = await supabase.from("teams").select("id, name");
+        teamUuid = (teamsData ?? []).find((x) => x.id === teamText || x.name === teamText)?.id ?? null;
+      }
+
       const [{ data: s }, { data: ev }] = await Promise.all([
-        teamText
-          ? supabase.from("standings").select("id, opponent_name, position, wins, losses, points").order("position", { ascending: true })
+        teamUuid
+          ? supabase.from("standings").select("id, opponent_name, position, wins, losses, points").eq("team_id", teamUuid).order("position", { ascending: true })
           : Promise.resolve({ data: [] as StandingRow[] }),
         supabase.from("club_events").select("id, title, description, event_date, kind").order("event_date", { ascending: true }),
       ]);

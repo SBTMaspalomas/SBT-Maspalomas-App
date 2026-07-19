@@ -105,10 +105,9 @@ const emptyState = (): ClubState => ({
 let state: ClubState = emptyState();
 const listeners = new Set<() => void>();
 
+// Notifica a los suscriptores del store. (No se persiste en localStorage: el estado se
+// rehidrata siempre desde Supabase vía useClubData, y nada releía "club_state_v1".)
 const persist = () => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("club_state_v1", JSON.stringify(state));
-  }
   listeners.forEach((l) => l());
 };
 
