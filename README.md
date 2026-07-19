@@ -14,19 +14,20 @@ Aplicación web integral para la gestión de un club de baloncesto, desarrollada
 
 ## Stack Tecnológico
 
-- **Frontend**: React 19 + Vite
+- **Framework**: TanStack Start + TanStack Router sobre React 19 y Vite
 - **Estilos**: Tailwind CSS 4
-- **UI Components**: shadcn/ui
+- **UI Components**: shadcn/ui (Radix UI)
+- **Datos/Estado**: TanStack Query · react-hook-form + zod
 - **Base de Datos**: Supabase (PostgreSQL)
 - **Almacenamiento**: Supabase Storage
 - **Autenticación**: Supabase Auth
-- **Routing**: TanStack Router
+- **Gestor de paquetes**: bun (`bun.lock` es el lockfile oficial)
 
 ## Instalación
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 ## Despliegue
