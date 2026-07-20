@@ -250,31 +250,43 @@ export function PaymentsAdmin() {
 }
 
 // ==================== PARENT/FAMILY DASHBOARD ====================
-export function PaymentsParent() {
+export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
   const { user, family } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
 
-  // Determinar las cuotas aplicables según los equipos principales de los hijos/as.
-  // A un adulto sin hijos con equipo no se le muestra ninguna referencia a cuotas.
+  // Determinar las cuotas aplicables según los equipos principales de los hijos/as
+  // (familia) o del propio jugador SENIOR (playerId). A un adulto sin jugadores con
+  // equipo no se le muestra ninguna referencia a cuotas.
   useEffect(() => {
-    const childTeamIds = (family?.children ?? [])
-      .map((c) => c.team_id)
-      .filter((id): id is string => Boolean(id));
-
-    if (childTeamIds.length === 0) {
-      setFeeTypes([]);
-      return;
-    }
-
     let cancelled = false;
     (async () => {
+      let teamIds = (family?.children ?? [])
+        .map((c) => c.team_id)
+        .filter((id): id is string => Boolean(id));
+
+      // Jugador SENIOR: derivar su equipo desde su propia ficha.
+      if (teamIds.length === 0 && playerId) {
+        const { data: self } = await supabase
+          .from("players")
+          .select("team_id")
+          .eq("id", playerId)
+          .maybeSingle();
+        if (self?.team_id) teamIds = [self.team_id];
+      }
+
+      if (cancelled) return;
+      if (teamIds.length === 0) {
+        setFeeTypes([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("teams")
         .select("id, category")
-        .in("id", childTeamIds);
+        .in("id", teamIds);
       if (cancelled) return;
       if (error || !data) {
         setFeeTypes([]);
@@ -284,23 +296,22 @@ export function PaymentsParent() {
     })();
 
     return () => { cancelled = true; };
-  }, [family?.children]);
+  }, [family?.children, playerId]);
 
   const loadPayments = useCallback(async () => {
-    if (!family?.id) return;
+    // Familia: cuotas por family_id. Jugador SENIOR (sin familia): por player_id.
+    if (!family?.id && !playerId) return;
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("family_id", family.id)
-      .order("created_at", { ascending: false });
+    let query = supabase.from("payments").select("*").order("created_at", { ascending: false });
+    query = family?.id ? query.eq("family_id", family.id) : query.eq("player_id", playerId!);
+    const { data, error } = await query;
 
     if (!error) {
       setPayments((data || []) as Payment[]);
     }
     setLoading(false);
-  }, [family?.id]);
+  }, [family?.id, playerId]);
 
   useEffect(() => {
     loadPayments();

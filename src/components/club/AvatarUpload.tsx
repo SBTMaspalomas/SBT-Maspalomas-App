@@ -1,7 +1,14 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Camera, Upload, X } from "lucide-react";
 
@@ -18,6 +25,7 @@ const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ACCEPTED_EXT = ".jpg, .jpeg, .png, .webp";
 
 export function AvatarUpload({ currentUrl, entityId, entityType, onUploaded }: AvatarUploadProps) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -48,10 +56,17 @@ export function AvatarUpload({ currentUrl, entityId, entityType, onUploaded }: A
     const file = selectedFile.current;
     if (!file) return;
 
+    if (!user) {
+      toast.error("Debes iniciar sesión");
+      return;
+    }
+
     setUploading(true);
     try {
       const ext = file.name.split(".").pop() || "jpg";
-      const path = `avatars/${entityType}_${entityId}_${Date.now()}.${ext}`;
+      // La política de Storage exige que el primer segmento de la ruta sea el
+      // id del usuario autenticado (carpeta propia). Ver RegistrationFlow.
+      const path = `${user.id}/avatars/${entityType}_${entityId}_${Date.now()}.${ext}`;
 
       const { data, error } = await supabase.storage
         .from("player-docs")
@@ -63,9 +78,17 @@ export function AvatarUpload({ currentUrl, entityId, entityType, onUploaded }: A
 
       // Actualizar en la tabla correspondiente
       if (entityType === "player") {
-        await supabase.from("players").update({ avatar_url: publicUrl } as any).eq("id", entityId);
+        const { error: updErr } = await supabase
+          .from("players")
+          .update({ avatar_url: publicUrl })
+          .eq("id", entityId);
+        if (updErr) throw updErr;
       } else {
-        await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", entityId);
+        const { error: updErr } = await supabase
+          .from("profiles")
+          .update({ avatar_url: publicUrl })
+          .eq("id", entityId);
+        if (updErr) throw updErr;
       }
 
       onUploaded(publicUrl);
@@ -98,9 +121,16 @@ export function AvatarUpload({ currentUrl, entityId, entityType, onUploaded }: A
           <div className="rounded-lg border border-dashed border-border bg-surface p-4 text-center">
             {preview ? (
               <div className="relative mx-auto w-fit">
-                <img src={preview} alt="Vista previa" className="mx-auto h-32 w-32 rounded-full object-cover" />
+                <img
+                  src={preview}
+                  alt="Vista previa"
+                  className="mx-auto h-32 w-32 rounded-full object-cover"
+                />
                 <button
-                  onClick={() => { setPreview(null); selectedFile.current = null; }}
+                  onClick={() => {
+                    setPreview(null);
+                    selectedFile.current = null;
+                  }}
                   className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-destructive text-white"
                 >
                   <X className="h-3 w-3" />
@@ -125,13 +155,26 @@ export function AvatarUpload({ currentUrl, entityId, entityType, onUploaded }: A
           </div>
 
           <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-1">
-            <p><strong>Formatos admitidos:</strong> JPG, PNG, WebP</p>
-            <p><strong>Tamaño máximo:</strong> {MAX_SIZE_MB} MB</p>
-            <p><strong>Resolución recomendada:</strong> 400×400 px (cuadrada)</p>
+            <p>
+              <strong>Formatos admitidos:</strong> JPG, PNG, WebP
+            </p>
+            <p>
+              <strong>Tamaño máximo:</strong> {MAX_SIZE_MB} MB
+            </p>
+            <p>
+              <strong>Resolución recomendada:</strong> 400×400 px (cuadrada)
+            </p>
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => { setOpen(false); setPreview(null); }}>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setOpen(false);
+                setPreview(null);
+              }}
+            >
               Cancelar
             </Button>
             <Button className="flex-1" disabled={!preview || uploading} onClick={handleUpload}>

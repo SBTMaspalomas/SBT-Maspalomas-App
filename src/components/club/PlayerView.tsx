@@ -20,6 +20,7 @@ export function PlayerView({ childId }: Props = {}) {
   const [loading, setLoading] = useState(true);
   const [standings, setStandings] = useState<StandingRow[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [teamLabel, setTeamLabel] = useState<string>("Sin equipo asignado");
 
   const child = useMemo(() => {
     if (!childId || !auth.family) return null;
@@ -52,6 +53,40 @@ export function PlayerView({ childId }: Props = {}) {
     load();
   }, [child]);
 
+  // Resolver el/los nombre(s) de equipo del jugador (evita mostrar el UUID en la cabecera).
+  useEffect(() => {
+    let active = true;
+    const resolveTeams = async () => {
+      if (!child?.id && !child?.team_id) {
+        if (active) setTeamLabel("Sin equipo asignado");
+        return;
+      }
+      const [{ data: teams }, { data: pTeams }] = await Promise.all([
+        supabase.from("teams").select("id, name, category"),
+        child?.id
+          ? supabase.from("player_teams").select("team_id").eq("player_id", child.id)
+          : Promise.resolve({ data: [] as Array<{ team_id: string }> }),
+      ]);
+      const teamList = teams ?? [];
+      const ids = new Set<string>();
+      (pTeams ?? []).forEach((pt) => ids.add(pt.team_id));
+      // Compatibilidad: players.team_id puede guardar un UUID o el nombre del equipo.
+      const primary = child?.team_id ?? null;
+      const names: string[] = [];
+      teamList.forEach((t) => {
+        if (ids.has(t.id) || t.id === primary || t.name === primary) {
+          names.push(`${t.name} (${t.category})`);
+        }
+      });
+      const label = names.length > 0
+        ? Array.from(new Set(names)).join(" · ")
+        : (primary ? primary : "Sin equipo asignado");
+      if (active) setTeamLabel(label);
+    };
+    resolveTeams();
+    return () => { active = false; };
+  }, [child]);
+
   // Filter demo matches: match on team_id text loosely against team name in demo store
   const teamMatches = useMemo(() => {
     if (!child?.team_id) return matches;
@@ -67,7 +102,6 @@ export function PlayerView({ childId }: Props = {}) {
   const next = sorted[0];
 
   const displayName = child?.full_name ?? auth.fullName ?? "Jugador/a";
-  const teamLabel = child?.team_id ?? "Sin equipo asignado";
 
   return (
     <div className="space-y-4">

@@ -16,7 +16,6 @@ import { RoleManager } from "@/components/club/RoleManager";
 import { PlayerView } from "@/components/club/PlayerView";
 import { FamilySelector } from "@/components/club/FamilySelector";
 import { TeamsManager } from "@/components/club/TeamsManager";
-import { PlayerTeamAssignment } from "@/components/club/PlayerTeamAssignment";
 import { ConvocatoriesManager } from "@/components/club/ConvocatoriesManager";
 import { ConvocatoriesPlayer } from "@/components/club/ConvocatoriesPlayer";
 import type { Role } from "@/lib/clubStore";
@@ -34,22 +33,22 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "asignacion" | "convocatorias" | "mis-convocatorias";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
-  { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family"] },
-  { id: "mizona", label: "Mi zona", icon: Trophy, roles: ["player"] },
-  { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent", "family"] },
+  { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"] },
+  // "Mi zona" pendiente de desarrollo — oculto hasta nueva orden.
+  { id: "mizona", label: "Mi zona", icon: Trophy, roles: [] },
+  { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent", "family", "senior", "staff"] },
   { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
   { id: "miembros", label: "Miembros", icon: Users2, roles: ["admin"] },
   { id: "equipos", label: "Equipos", icon: Zap, roles: ["admin"] },
-  { id: "asignacion", label: "Asignar Equipos", icon: Trophy, roles: ["admin"] },
   { id: "convocatorias", label: "Convocatorias", icon: ClipboardCheck, roles: ["admin", "coach"] },
-  { id: "mis-convocatorias", label: "Mis Convocatorias", icon: ClipboardCheck, roles: ["player"] },
+  { id: "mis-convocatorias", label: "Mis Convocatorias", icon: ClipboardCheck, roles: ["player", "senior"] },
   { id: "validacion", label: "Validación docs.", icon: ShieldCheck, roles: ["admin"] },
-  { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family"] },
+  { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family", "senior"] },
   { id: "asistencia", label: "Control de asistencia", icon: ClipboardCheck, roles: ["coach"] },
-  { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player", "family"] },
+  { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"] },
 ];
 
 function ClubApp() {
@@ -173,6 +172,8 @@ function ClubApp() {
     : auth.role === "admin" ? "Administrador"
     : auth.role === "coach" ? "Entrenador"
     : auth.role === "family" ? "Adultos Responsables"
+    : auth.role === "senior" ? "Jugador Senior"
+    : auth.role === "staff" ? "Staff"
     : "Usuario";
   const initials = displayName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
@@ -246,7 +247,12 @@ function ClubApp() {
         {/* Main */}
         <main className="space-y-4">
           {isChildProfile ? (
-            <PlayerView childId={childId} />
+            <>
+              {(view === "inicio" || view === "mizona") && <PlayerView childId={childId} />}
+              {view === "mis-convocatorias" && <ConvocatoriesPlayer playerId={childId} />}
+              {view === "chats" && <Chats />}
+              {view === "cartelera" && <NewsBoard />}
+            </>
           ) : (
             <>
               {view === "inicio" && <Home setView={setView} effectiveRole={effectiveRole} />}
@@ -255,12 +261,13 @@ function ClubApp() {
               {view === "registro" && <RegistrationFlow />}
               {view === "miembros" && auth.role === "admin" && <RoleManager />}
               {view === "equipos" && auth.role === "admin" && <TeamsManager />}
-              {view === "asignacion" && auth.role === "admin" && <PlayerTeamAssignment />}
               {view === "convocatorias" && (auth.role === "admin" || auth.role === "coach") && <ConvocatoriesManager />}
               {view === "mis-convocatorias" && auth.role === "player" && <ConvocatoriesPlayer />}
+              {view === "mis-convocatorias" && auth.role === "senior" && <ConvocatoriesPlayer playerId={auth.selfPlayerId ?? undefined} />}
               {view === "validacion" && auth.role === "admin" && <ValidationConsole />}
               {view === "pagos" && auth.role === "admin" && <PaymentsAdmin />}
               {view === "pagos" && (auth.role === "parent" || auth.role === "family") && <PaymentsParent />}
+              {view === "pagos" && auth.role === "senior" && <PaymentsParent playerId={auth.selfPlayerId ?? undefined} />}
               {view === "asistencia" && auth.role === "coach" && <Attendance />}
               {view === "chats" && <Chats />}
             </>
@@ -312,6 +319,8 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
               {role === "admin" && "Tienes control total: finanzas, validación documental, mensajería y cartelera."}
               {role === "coach" && "Gestiona la asistencia de tus equipos y comunica con jugadores y padres."}
               {role === "player" && "Consulta tu jornada, calendario, clasificación y noticias del club."}
+              {role === "senior" && "Consulta tus convocatorias, tu cuota y los chats de tus equipos."}
+              {role === "staff" && "Consulta la cartelera y los chats del club."}
             </p>
             {auth.family && (
               <div className="mt-2 text-xs text-muted-foreground">

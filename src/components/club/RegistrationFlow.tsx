@@ -47,11 +47,23 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
     loadTeams();
   }, []);
 
+  // Tipo principal de usuario adulto que se registra.
+  //  - responsible: ADULTO RESPONSABLE de menor(es)  → rol family
+  //  - senior:      Jugador SENIOR (+18)             → rol senior
+  //  - coach:       ENTRENADOR                        → rol coach
+  //  - staff:       STAFF / otras funciones           → rol staff
+  type AdultType = "responsible" | "senior" | "coach" | "staff";
+  const ROLE_BY_TYPE: Record<AdultType, string> = {
+    responsible: "family", senior: "senior", coach: "coach", staff: "staff",
+  };
+
   // Datos del adulto
   const [adult, setAdult] = useState({
     firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "",
-    phone: "", email: "", isResponsible: false
+    phone: "", email: "", adultType: "responsible" as AdultType,
   });
+  const isResponsible = adult.adultType === "responsible";
+  const isSenior = adult.adultType === "senior";
   
   // Datos de hijos
   const [children, setChildren] = useState<Array<{firstName: string; lastName: string; birthDate: string; docNumber: string; teamId: string}>>([]);
@@ -82,7 +94,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       toast.error("Introduce un email válido");
       return;
     }
-    setStep(adult.isResponsible ? 2 : 3);
+    setStep(isResponsible ? 2 : 3);
   };
 
   const handleAdultChange = (field: string, value: string | boolean) => {
@@ -141,7 +153,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
 
       // 2. Si es responsable de menores, crear family_meta
       let familyId: string | null = null;
-      if (adult.isResponsible && children.length > 0) {
+      if (isResponsible && children.length > 0) {
         let { data: family } = await supabase.from("families_meta").select("id").eq("head_profile_id", user.id).maybeSingle();
         if (!family) {
           const { data: newFamily, error: famErr } = await supabase.from("families_meta").insert({
@@ -200,7 +212,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       if (adultRegErr) throw adultRegErr;
 
       // 5. Guardar registros de MENORES en tabla registrations + players
-      if (adult.isResponsible && children.length > 0 && familyId) {
+      if (isResponsible && children.length > 0 && familyId) {
         for (const child of children) {
           // Insertar en registrations
           const { error: childRegErr } = await supabase.from("registrations").insert({
@@ -232,12 +244,38 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
 
       }
 
+      // 6. SENIOR: crear su propia ficha de jugador (adulto que es jugador) para
+      //    que cuotas, equipos y convocatorias funcionen igual que con cualquier
+      //    jugador. Se vincula por players.user_id.
+      if (isSenior) {
+        const { data: existingSelf } = await supabase
+          .from("players")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!existingSelf) {
+          const { error: selfErr } = await supabase.from("players").insert({
+            full_name: `${adult.firstName} ${adult.lastName}`,
+            birth_date: adult.birthDate || null,
+            user_id: user.id,
+          });
+          if (selfErr) console.warn("No se pudo crear la ficha de jugador senior:", selfErr.message);
+        }
+      }
+
+      // 7. Asignar el rol principal según el tipo elegido, vía RPC SECURITY DEFINER
+      //    (un usuario no puede escribir en user_roles directamente por RLS). Si el
+      //    RPC aún no existe en la BD, el registro no falla: el admin ajustará el rol.
+      const desiredRole = ROLE_BY_TYPE[adult.adultType];
+      const { error: roleErr } = await supabase.rpc("set_self_registration_role", { _role: desiredRole } as any);
+      if (roleErr) console.warn("No se pudo asignar el rol de registro:", roleErr.message);
+
       toast.success("Registro completado exitosamente");
       if (onComplete) {
         onComplete();
       } else {
         setStep(1);
-        setAdult({firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "", phone: "", email: "", isResponsible: false});
+        setAdult({firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "", phone: "", email: "", adultType: "responsible"});
         setChildren([]);
         setDocs({photo: "", dniFront: "", dniBack: "", signature: "", auth_image: false, auth_travel: false, auth_medical: false, auth_data_sharing: false});
         setDocFiles({});
@@ -301,9 +339,26 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
                 <Input type="email" value={adult.email} onChange={(e) => handleAdultChange("email", e.target.value)} />
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox checked={adult.isResponsible} onCheckedChange={(v) => handleAdultChange("isResponsible", v)} />
-              <Label>Soy adulto responsable de un menor de edad</Label>
+            <div>
+              <Label>Tipo de usuario</Label>
+              <Select value={adult.adultType} onValueChange={(v) => handleAdultChange("adultType", v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="responsible">Adulto responsable de un menor</SelectItem>
+                  <SelectItem value="senior">Jugador Senior (+18)</SelectItem>
+                  <SelectItem value="coach">Entrenador</SelectItem>
+                  <SelectItem value="staff">Staff / otras funciones</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isResponsible
+                  ? "Registrarás tus datos y los de tu(s) hijo(s) menor(es)."
+                  : isSenior
+                    ? "Te registras como jugador adulto. Verás tu cuota y tus convocatorias."
+                    : "Te registras como adulto del club. No se añaden menores ni cuotas."}
+              </p>
             </div>
             <Button onClick={goFromStep1} className="w-full">Siguiente</Button>
           </CardContent>
@@ -400,19 +455,31 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
               </div>
             </div>
 
-            {/* Documentos de cada hijo */}
-            {children.length > 0 && children.map((child, idx) => (
+            {/* Documentos de cada hijo (solo adulto responsable) */}
+            {isResponsible && children.length > 0 && children.map((child, idx) => (
               <div key={idx} className="space-y-3 p-3 rounded-lg border border-border bg-surface">
                 <p className="text-sm font-bold text-primary">Documentos del menor: {child.firstName} {child.lastName}</p>
                 <p className="text-xs text-muted-foreground">Los documentos de los menores se pueden aportar más adelante desde el panel de familia.</p>
               </div>
             ))}
 
+            {/* Cuota del jugador SENIOR */}
+            {isSenior && (
+              <div className="space-y-1 p-3 rounded-lg border border-primary/30 bg-primary/5">
+                <p className="text-sm font-bold text-primary">Cuota de jugador Senior</p>
+                <p className="text-xs text-muted-foreground">
+                  Como jugador Senior se te asignará la cuota que te corresponde abonar.
+                  Podrás consultarla y subir tu justificante desde el apartado
+                  «Cuotas y pagos» de tu panel.
+                </p>
+              </div>
+            )}
+
             {/* Autorizaciones */}
             <div className="space-y-3 p-3 bg-muted rounded">
               <p className="font-semibold text-sm">Autorizaciones</p>
              
-              {adult.isResponsible && (
+              {isResponsible && (
                 <>
                   <div className="flex items-start space-x-2">
                     <Checkbox checked={docs.auth_image} onCheckedChange={(v) => handleDocChange("auth_image", v)} />
@@ -441,7 +508,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep(adult.isResponsible ? 2 : 1)} className="flex-1">Atrás</Button>
+              <Button variant="outline" onClick={() => setStep(isResponsible ? 2 : 1)} className="flex-1">Atrás</Button>
               <Button onClick={submit} disabled={isSubmitting} className="flex-1">
                 {isSubmitting ? "Enviando..." : "Completar Registro"}
               </Button>

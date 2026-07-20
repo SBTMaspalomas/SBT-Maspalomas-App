@@ -27,12 +27,12 @@ interface PlayerResponse {
   notes?: string;
 }
 
-export function ConvocatoriesPlayer() {
+export function ConvocatoriesPlayer({ playerId: playerIdProp }: { playerId?: string } = {}) {
   const { activeProfile } = useAuth();
-  // Identidad del jugador: hoy el perfil de jugador se sirve como perfil de hijo dentro de
-  // una cuenta de familia (activeProfile.childId apunta a players.id). Sin ese perfil no se
-  // puede identificar al jugador, así que no se permite responder.
-  const playerId = activeProfile?.kind === "child" ? activeProfile.childId : null;
+  // Identidad del jugador. Prioriza el prop (p. ej. jugador SENIOR: su ficha propia vía
+  // auth.selfPlayerId). Si no, se usa el perfil de hijo de una cuenta de familia
+  // (activeProfile.childId apunta a players.id). Sin ninguno, no se permite responder.
+  const playerId = playerIdProp ?? (activeProfile?.kind === "child" ? activeProfile.childId : null);
 
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [responses, setResponses] = useState<Map<string, PlayerResponse>>(new Map());
