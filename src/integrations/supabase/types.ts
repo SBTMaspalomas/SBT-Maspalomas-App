@@ -8,6 +8,47 @@ export type Database = {
   };
   public: {
     Tables: {
+      chat_channels: {
+        Row: {
+          channel_key: string;
+          created_at: string;
+          enabled: boolean;
+          id: string;
+          kind: string;
+          status: string;
+          team_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          channel_key: string;
+          created_at?: string;
+          enabled?: boolean;
+          id?: string;
+          kind: string;
+          status?: string;
+          team_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          channel_key?: string;
+          created_at?: string;
+          enabled?: boolean;
+          id?: string;
+          kind?: string;
+          status?: string;
+          team_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_channels_team_id_fkey";
+            columns: ["team_id"];
+            isOneToOne: false;
+            referencedRelation: "teams";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       club_events: {
         Row: {
           created_at: string;
