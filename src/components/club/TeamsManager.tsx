@@ -9,10 +9,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Edit2, Trash2, Users, Trophy, RefreshCw, ArrowLeftRight } from "lucide-react";
+import { Plus, Edit2, Trash2, Users, Trophy, RefreshCw, ArrowLeftRight, MessagesSquare } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PlayerTeamAssignment } from "@/components/club/PlayerTeamAssignment";
+import { ChatsManager } from "@/components/club/ChatsManager";
 
 interface Team {
   id: string;
@@ -32,6 +33,7 @@ export function TeamsManager() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [chatsOpen, setChatsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: "", category: "" });
 
@@ -127,6 +129,20 @@ export function TeamsManager() {
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
+          <Dialog open={chatsOpen} onOpenChange={setChatsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <MessagesSquare className="h-4 w-4 mr-2" />
+                Gestionar chats
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Gestión de chats</DialogTitle>
+              </DialogHeader>
+              <ChatsManager />
+            </DialogContent>
+          </Dialog>
           <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
             <DialogTrigger asChild>
               <Button>

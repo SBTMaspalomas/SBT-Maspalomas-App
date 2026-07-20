@@ -4,9 +4,10 @@ import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Megaphone, Users, Baby, MessageSquareLock, Lock, ShieldAlert } from "lucide-react";
+import { Send, Megaphone, Users, Baby, MessageSquareLock, Lock, ShieldAlert, ShieldCheck, Dumbbell, Briefcase } from "lucide-react";
+import { channelKey, effectiveState, type ChatChannelConfig } from "@/lib/chatChannels";
 
-type ChannelKind = "team" | "family" | "broadcast" | "private";
+type ChannelKind = "team" | "family" | "broadcast" | "private" | "admins" | "coaches" | "staff";
 
 interface Channel {
   id: string;
@@ -17,6 +18,7 @@ interface Channel {
   familyId?: string; // private (admin<->family)
   familyLabel?: string;
   canWrite: boolean;
+  readOnlyReason?: string; // e.g. canal cerrado por el administrador
   restricted?: string; // reason if restricted (e.g. U12)
 }
 
@@ -29,11 +31,12 @@ interface PrivateMsg { id: string; sender_id: string; receiver_family_id: string
 const isU12 = (t?: TeamRow) => (t?.age_category ?? "U14+") === "U12";
 
 export function Chats() {
-  const { user, role, fullName, family, activeProfile } = useAuth();
+  const { user, role, roles, fullName, family, activeProfile } = useAuth();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [families, setFamilies] = useState<FamilyRow[]>([]);
   const [coachTeamIds, setCoachTeamIds] = useState<string[]>([]);
+  const [channelConfig, setChannelConfig] = useState<Map<string, ChatChannelConfig>>(new Map());
   const [groupMsgs, setGroupMsgs] = useState<GroupMsg[]>([]);
   const [privateMsgs, setPrivateMsgs] = useState<PrivateMsg[]>([]);
   const [active, setActive] = useState<string>("");
@@ -49,7 +52,7 @@ export function Chats() {
     if (!user) return;
     let active = true;
     (async () => {
-      const [teamsR, playersR, familiesR, coachR] = await Promise.all([
+      const [teamsR, playersR, familiesR, coachR, configR] = await Promise.all([
         supabase.from("teams").select("id, name, category, age_category").order("name"),
         supabase.from("players").select("id, full_name, team_id, family_id"),
         role === "admin"
@@ -58,12 +61,16 @@ export function Chats() {
         role === "coach"
           ? supabase.from("coach_teams").select("team_id").eq("user_id", user.id)
           : Promise.resolve({ data: [], error: null } as { data: { team_id: string }[]; error: null }),
+        supabase.from("chat_channels").select("channel_key, kind, team_id, enabled, status"),
       ]);
       if (!active) return;
       setTeams((teamsR.data ?? []) as TeamRow[]);
       setPlayers((playersR.data ?? []) as PlayerRow[]);
       setFamilies((familiesR.data ?? []) as FamilyRow[]);
       setCoachTeamIds(((coachR.data ?? []) as { team_id: string }[]).map((r) => String(r.team_id)));
+      const cfgMap = new Map<string, ChatChannelConfig>();
+      ((configR.data ?? []) as ChatChannelConfig[]).forEach((c) => cfgMap.set(c.channel_key, c));
+      setChannelConfig(cfgMap);
     })();
     return () => { active = false; };
   }, [user, role]);
@@ -74,6 +81,19 @@ export function Chats() {
     const list: Channel[] = [];
     const teamById = new Map(teams.map((t) => [t.id, t]));
     const teamByAnyKey = (key: string) => teams.find((t) => t.id === key || t.name === key);
+
+    // Canales de rol (Administradores / Entrenadores / Staff). El admin participa
+    // en los tres; entrenadores y staff en el suyo. Se basan en el array de roles
+    // (un usuario puede tener varios) y no van asociados a ningún equipo.
+    const roleSet = new Set(roles);
+    if (roleSet.has("admin")) {
+      list.push({ id: "admins", kind: "admins", label: "Administradores", icon: ShieldCheck, canWrite: true });
+      list.push({ id: "coaches", kind: "coaches", label: "Entrenadores", icon: Dumbbell, canWrite: true });
+      list.push({ id: "staff", kind: "staff", label: "Staff", icon: Briefcase, canWrite: true });
+    } else {
+      if (roleSet.has("coach")) list.push({ id: "coaches", kind: "coaches", label: "Entrenadores", icon: Dumbbell, canWrite: true });
+      if (roleSet.has("staff")) list.push({ id: "staff", kind: "staff", label: "Staff", icon: Briefcase, canWrite: true });
+    }
 
     if (role === "admin") {
       teams.forEach((t) => {
@@ -145,10 +165,21 @@ export function Chats() {
       }
     }
 
+    // Aplica la configuración del administrador a los canales gestionables:
+    // los desactivados/archivados se ocultan y los cerrados quedan en solo lectura.
+    // Los canales privados (admin<->familia) no se gestionan desde aquí.
+    const configured = list.flatMap<Channel>((c) => {
+      if (c.kind === "private") return [c];
+      const st = effectiveState(channelConfig.get(channelKey(c.kind, c.teamId)));
+      if (!st.visible) return [];
+      if (!st.writable) return [{ ...c, canWrite: false, readOnlyReason: "Canal cerrado por el administrador." }];
+      return [c];
+    });
+
     // De-duplicate by id
     const seen = new Set<string>();
-    return list.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
-  }, [user, role, teams, coachTeamIds, families, players, family, isChildProfile, isAdultFamily, currentChildId]);
+    return configured.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
+  }, [user, role, roles, teams, coachTeamIds, families, players, family, isChildProfile, isAdultFamily, currentChildId, channelConfig]);
 
   // Auto-select first channel
   useEffect(() => {
@@ -214,7 +245,7 @@ export function Chats() {
       .on("postgres_changes",
         channel.kind === "private"
           ? { event: "INSERT", schema: "public", table: "private_messages", filter: `receiver_family_id=eq.${channel.familyId}` }
-          : { event: "INSERT", schema: "public", table: "team_messages", filter: channel.teamId ? `team_id=eq.${channel.teamId}` : `channel_type=eq.broadcast` },
+          : { event: "INSERT", schema: "public", table: "team_messages", filter: channel.teamId ? `team_id=eq.${channel.teamId}` : `channel_type=eq.${channel.kind}` },
         (payload) => {
           if (channel.kind === "private") {
             setPrivateMsgs((prev) => [...prev, payload.new as PrivateMsg]);
@@ -310,7 +341,7 @@ export function Chats() {
                   <Button onClick={send}><Send className="h-4 w-4" /></Button>
                 </div>
               ) : (
-                <div className="px-2 py-1.5 text-center text-xs text-muted-foreground">Canal solo lectura · únicamente entrenador/admin escriben.</div>
+                <div className="px-2 py-1.5 text-center text-xs text-muted-foreground">{channel?.readOnlyReason ?? "Canal solo lectura · únicamente entrenador/admin escriben."}</div>
               )}
             </div>
           </div>
