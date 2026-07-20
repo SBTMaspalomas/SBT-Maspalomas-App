@@ -4,16 +4,10 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Calendar, MapPin, Users, Trash2, Eye } from "lucide-react";
+import { Plus, Calendar, MapPin, Users, Trash2 } from "lucide-react";
 
 interface Convocatoria {
   id: string;
@@ -39,15 +33,13 @@ interface ConvocatoriaResponse {
 }
 
 export function ConvocatoriesManager() {
-  const auth = useAuth();
+  const { user } = useAuth();
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [responses, setResponses] = useState<ConvocatoriaResponse[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [players, setPlayers] = useState<any[]>([]);
-  const [playerTeams, setPlayerTeams] = useState<Array<{ player_id: string; team_id: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
-  const [selectedConvocatoria, setSelectedConvocatoria] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -57,7 +49,6 @@ export function ConvocatoriesManager() {
     time: "",
     location: "",
     notes: "",
-    selectedPlayers: [] as string[],
   });
 
   const loadData = useCallback(async () => {
@@ -67,20 +58,17 @@ export function ConvocatoriesManager() {
       { data: respData },
       { data: teamsData },
       { data: playersData },
-      { data: playerTeamsData },
     ] = await Promise.all([
       supabase.from("convocatorias").select("*").order("date", { ascending: false }),
       supabase.from("convocatoria_responses").select("*"),
       supabase.from("teams").select("id, name"),
-      supabase.from("players").select("id, full_name, team_id"),
-      supabase.from("player_teams").select("player_id, team_id"),
+      supabase.from("players").select("id, full_name"),
     ]);
 
     setConvocatorias((convData || []) as Convocatoria[]);
     setResponses((respData || []) as ConvocatoriaResponse[]);
     setTeams(teamsData || []);
     setPlayers(playersData || []);
-    setPlayerTeams((playerTeamsData || []) as Array<{ player_id: string; team_id: string }>);
     setLoading(false);
   }, []);
 
@@ -88,67 +76,29 @@ export function ConvocatoriesManager() {
     loadData();
   }, [loadData]);
 
-  // Jugadores que pertenecen al equipo seleccionado (por player_teams o, en su
-  // defecto, por el equipo principal players.team_id).
-  const rosterForSelectedTeam = players.filter(
-    (p) =>
-      playerTeams.some((pt) => pt.player_id === p.id && pt.team_id === formData.team_id) ||
-      p.team_id === formData.team_id,
-  );
-
-  const togglePlayer = (playerId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectedPlayers: prev.selectedPlayers.includes(playerId)
-        ? prev.selectedPlayers.filter((id) => id !== playerId)
-        : [...prev.selectedPlayers, playerId],
-    }));
-  };
-
   const handleCreateConvocatoria = async () => {
     if (!formData.team_id || !formData.date || !formData.time || !formData.location) {
       toast.error("Completa todos los campos requeridos");
       return;
     }
-
-    if (!auth.user) {
+    if (!user) {
       toast.error("Debes iniciar sesión");
       return;
     }
 
-    const { data: created, error } = await supabase
-      .from("convocatorias")
-      .insert({
-        team_id: formData.team_id,
-        type: formData.type,
-        date: formData.date,
-        time: formData.time,
-        location: formData.location,
-        notes: formData.notes || null,
-        created_by: auth.user.id,
-      })
-      .select()
-      .single();
+    const { error } = await supabase.from("convocatorias").insert({
+      team_id: formData.team_id,
+      type: formData.type,
+      date: formData.date,
+      time: formData.time,
+      location: formData.location,
+      notes: formData.notes || null,
+      created_by: user.id,
+    });
 
-    if (error || !created) {
-      toast.error(`Error al crear convocatoria: ${error?.message ?? "desconocido"}`);
+    if (error) {
+      toast.error("Error al crear convocatoria");
       return;
-    }
-
-    // Crear una respuesta "pendiente" por cada jugador convocado.
-    if (formData.selectedPlayers.length > 0) {
-      const { error: respErr } = await supabase.from("convocatoria_responses").insert(
-        formData.selectedPlayers.map((playerId) => ({
-          convocatoria_id: created.id,
-          player_id: playerId,
-          status: "pending",
-        })),
-      );
-      if (respErr) {
-        toast.error(
-          `Convocatoria creada, pero fallaron las convocatorias de jugadores: ${respErr.message}`,
-        );
-      }
     }
 
     toast.success("Convocatoria creada");
@@ -159,7 +109,6 @@ export function ConvocatoriesManager() {
       time: "",
       location: "",
       notes: "",
-      selectedPlayers: [],
     });
     setOpenDialog(false);
     loadData();
@@ -209,9 +158,7 @@ export function ConvocatoriesManager() {
                 <label className="text-sm font-medium">Tipo</label>
                 <select
                   value={formData.type}
-                  onChange={(e) =>
-                    setFormData({ ...formData, type: e.target.value as "training" | "match" })
-                  }
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value as "training" | "match" })}
                   className="w-full rounded border border-border bg-background p-2 text-sm"
                 >
                   <option value="training">Entrenamiento</option>
@@ -228,9 +175,7 @@ export function ConvocatoriesManager() {
                 >
                   <option value="">Selecciona un equipo</option>
                   {teams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
+                    <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
                 </select>
               </div>
@@ -274,33 +219,6 @@ export function ConvocatoriesManager() {
                 />
               </div>
 
-              {formData.team_id && (
-                <div>
-                  <label className="text-sm font-medium">Jugadores convocados</label>
-                  {rosterForSelectedTeam.length === 0 ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Este equipo no tiene jugadores asignados todavía.
-                    </p>
-                  ) : (
-                    <div className="mt-1 max-h-40 space-y-1 overflow-y-auto rounded border border-border p-2">
-                      {rosterForSelectedTeam.map((p) => (
-                        <label
-                          key={p.id}
-                          className="flex cursor-pointer items-center gap-2 text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.selectedPlayers.includes(p.id)}
-                            onChange={() => togglePlayer(p.id)}
-                          />
-                          {p.full_name}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
               <Button onClick={handleCreateConvocatoria} className="w-full">
                 Crear Convocatoria
               </Button>
@@ -324,11 +242,7 @@ export function ConvocatoriesManager() {
             const stats = getResponseStats(conv.id);
             const team = teams.find((t) => t.id === conv.team_id);
             const date = new Date(conv.date);
-            const dateStr = date.toLocaleDateString("es-ES", {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            });
+            const dateStr = date.toLocaleDateString("es-ES", { weekday: "short", month: "short", day: "numeric" });
 
             return (
               <Card key={conv.id} className="p-4">
@@ -380,13 +294,6 @@ export function ConvocatoriesManager() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedConvocatoria(conv.id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

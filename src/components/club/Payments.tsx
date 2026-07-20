@@ -5,24 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import {
-  Upload,
-  Download,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  DollarSign,
-  FileText,
-  Eye,
-} from "lucide-react";
+import { Upload, Download, CheckCircle2, Clock, XCircle, DollarSign, FileText, Eye } from "lucide-react";
+import { CuotaAnual, FeeSchedulesEditor, feeTypeForCategory, type FeeType } from "./CuotaAnual";
 
 interface Payment {
   id: string;
@@ -49,16 +35,8 @@ interface Team {
 }
 
 const statusConfig = {
-  pending: {
-    label: "Pendiente",
-    icon: Clock,
-    color: "bg-yellow-50 text-yellow-700 border-yellow-200",
-  },
-  paid: {
-    label: "Pagado",
-    icon: CheckCircle2,
-    color: "bg-green-50 text-green-700 border-green-200",
-  },
+  pending: { label: "Pendiente", icon: Clock, color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  paid: { label: "Pagado", icon: CheckCircle2, color: "bg-green-50 text-green-700 border-green-200" },
   rejected: { label: "Rechazado", icon: XCircle, color: "bg-red-50 text-red-700 border-red-200" },
 };
 
@@ -90,10 +68,7 @@ export function PaymentsAdmin() {
     loadData();
   }, [loadData]);
 
-  const updatePaymentStatus = async (
-    paymentId: string,
-    status: "pending" | "paid" | "rejected",
-  ) => {
+  const updatePaymentStatus = async (paymentId: string, status: "pending" | "paid" | "rejected") => {
     const { error } = await supabase
       .from("payments")
       .update({ status, paid_at: status === "paid" ? new Date().toISOString() : null })
@@ -117,12 +92,13 @@ export function PaymentsAdmin() {
   };
 
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-  const paidAmount = payments
-    .filter((p) => p.status === "paid")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const paidAmount = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <div className="space-y-4">
+      {/* Configuración de cuotas (editable por el administrador) */}
+      <FeeSchedulesEditor />
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Card className="p-3">
@@ -166,14 +142,11 @@ export function PaymentsAdmin() {
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           ) : payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No hay pagos registrados
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-4">No hay pagos registrados</p>
           ) : (
             payments.map((payment) => {
               const config = statusConfig[payment.status];
               const Icon = config.icon;
-              const player = players.find((p) => p.id === payment.player_id);
 
               return (
                 <button
@@ -187,9 +160,7 @@ export function PaymentsAdmin() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{payment.player_name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {payment.period} · {payment.amount}€
-                      </div>
+                      <div className="text-xs text-muted-foreground">{payment.period} · {payment.amount}€</div>
                     </div>
                     <Badge variant="outline" className={config.color}>
                       <Icon className="h-3 w-3 mr-1" />
@@ -226,9 +197,7 @@ export function PaymentsAdmin() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">Fecha:</span>
-                  <p className="font-medium">
-                    {new Date(selectedPayment.created_at).toLocaleDateString("es-ES")}
-                  </p>
+                  <p className="font-medium">{new Date(selectedPayment.created_at).toLocaleDateString("es-ES")}</p>
                 </div>
               </div>
 
@@ -286,6 +255,48 @@ export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
+
+  // Determinar las cuotas aplicables según los equipos principales de los hijos/as
+  // (familia) o del propio jugador SENIOR (playerId). A un adulto sin jugadores con
+  // equipo no se le muestra ninguna referencia a cuotas.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let teamIds = (family?.children ?? [])
+        .map((c) => c.team_id)
+        .filter((id): id is string => Boolean(id));
+
+      // Jugador SENIOR: derivar su equipo desde su propia ficha.
+      if (teamIds.length === 0 && playerId) {
+        const { data: self } = await supabase
+          .from("players")
+          .select("team_id")
+          .eq("id", playerId)
+          .maybeSingle();
+        if (self?.team_id) teamIds = [self.team_id];
+      }
+
+      if (cancelled) return;
+      if (teamIds.length === 0) {
+        setFeeTypes([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, category")
+        .in("id", teamIds);
+      if (cancelled) return;
+      if (error || !data) {
+        setFeeTypes([]);
+        return;
+      }
+      setFeeTypes(data.map((t) => feeTypeForCategory((t as { category?: string }).category)));
+    })();
+
+    return () => { cancelled = true; };
+  }, [family?.children, playerId]);
 
   const loadPayments = useCallback(async () => {
     // Familia: cuotas por family_id. Jugador SENIOR (sin familia): por player_id.
@@ -350,20 +361,21 @@ export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
   };
 
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-  const paidAmount = payments
-    .filter((p) => p.status === "paid")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const paidAmount = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
   const pendingAmount = totalAmount - paidAmount;
 
   return (
     <div className="space-y-4">
+      {/* Cuota anual (informativa) — solo la(s) del equipo principal de los hijos/as */}
+      <CuotaAnual types={feeTypes} />
+
       {/* Status Summary */}
       <Card className="p-4 bg-gradient-to-r from-primary/10 to-primary/5">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm text-muted-foreground">Estado General</div>
             <div className="text-2xl font-bold mt-1">
-              {stats.paid === stats.total ? "✓ Al día" : `${stats.pending} pendientes`}
+              {stats.total > 0 && stats.paid === stats.total ? "✓ Al día" : `${stats.pending} pendientes`}
             </div>
           </div>
           <div className="text-right">
@@ -398,9 +410,7 @@ export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Cargando...</p>
           ) : payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No hay pagos pendientes
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-4">No hay pagos pendientes</p>
           ) : (
             payments.map((payment) => {
               const config = statusConfig[payment.status];
@@ -411,9 +421,7 @@ export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="font-medium text-sm">{payment.period}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {payment.player_name}
-                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">{payment.player_name}</div>
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-sm">{payment.amount}€</div>

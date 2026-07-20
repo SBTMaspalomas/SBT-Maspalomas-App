@@ -61,6 +61,7 @@ export type Database = {
       };
       families_meta: {
         Row: {
+          adult_pin: string | null;
           created_at: string;
           head_email: string | null;
           head_profile_id: string | null;
@@ -69,6 +70,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          adult_pin?: string | null;
           created_at?: string;
           head_email?: string | null;
           head_profile_id?: string | null;
@@ -77,6 +79,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          adult_pin?: string | null;
           created_at?: string;
           head_email?: string | null;
           head_profile_id?: string | null;

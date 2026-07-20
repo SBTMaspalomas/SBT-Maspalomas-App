@@ -150,9 +150,12 @@ function ChildTile({ child, onClick }: { child: FamilyChild; onClick: () => void
 
   useEffect(() => {
     if (!child.team_id) return;
-    supabase.from("teams").select("name, category").eq("id", child.team_id).maybeSingle()
+    // team_id puede ser un UUID o un nombre (datos mixtos); cargar y emparejar por id o name
+    // para no lanzar 22P02 (invalid uuid) al filtrar por .eq("id", <nombre>).
+    supabase.from("teams").select("id, name, category")
       .then(({ data }) => {
-        if (data) setTeamName(`${data.name} (${data.category})`);
+        const t = (data ?? []).find((x) => x.id === child.team_id || x.name === child.team_id);
+        if (t) setTeamName(`${t.name} (${t.category})`);
       });
   }, [child.team_id]);
 
@@ -195,10 +198,11 @@ function FamilyTeams({ children }: { children: FamilyChild[] }) {
   const [teams, setTeams] = useState<Array<{id: string; name: string; category: string}>>([]);
 
   useEffect(() => {
-    // Cargar equipos de los hijos
-    const teamIds = children.map(c => c.team_id).filter(Boolean) as string[];
-    if (teamIds.length > 0) {
-      supabase.from("teams").select("id, name, category").in("id", teamIds)
+    // Cargar todos los equipos y emparejar en cliente por id o name (team_id puede ser
+    // un UUID o un nombre); filtrar por .in("id", <nombres>) lanzaría 22P02.
+    const teamKeys = children.map(c => c.team_id).filter(Boolean) as string[];
+    if (teamKeys.length > 0) {
+      supabase.from("teams").select("id, name, category")
         .then(({ data }) => { if (data) setTeams(data); });
     }
   }, [children]);
@@ -215,7 +219,7 @@ function FamilyTeams({ children }: { children: FamilyChild[] }) {
           </div>
           <div className="space-y-2">
             {children.map((child) => {
-              const team = teams.find(t => t.id === child.team_id);
+              const team = teams.find(t => t.id === child.team_id || t.name === child.team_id);
               if (!team) return null;
               return (
                 <div key={child.id} className="flex items-center gap-3 rounded-lg border border-border bg-background p-3">

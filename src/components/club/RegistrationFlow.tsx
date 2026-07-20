@@ -1,17 +1,11 @@
-"use client";
+'use client';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SignaturePad } from "./SignaturePad";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -19,17 +13,7 @@ import { toast } from "sonner";
 import { Upload, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
-const FileButton = ({
-  label,
-  value,
-  onChange,
-  accept = "image/*",
-}: {
-  label: string;
-  value?: string;
-  onChange: (name: string) => void;
-  accept?: string;
-}) => (
+const FileButton = ({ label, value, onChange, accept = "image/*" }: { label: string; value?: string; onChange: (file: File) => void; accept?: string }) => (
   <label className="flex cursor-pointer items-center justify-between rounded-md border border-dashed border-border bg-surface px-3 py-2.5 text-sm hover:border-primary">
     <span className="flex items-center gap-2 text-muted-foreground">
       <Upload className="h-4 w-4" />
@@ -42,7 +26,7 @@ const FileButton = ({
       className="hidden"
       onChange={(e) => {
         const f = e.target.files?.[0];
-        if (f) onChange(f.name);
+        if (f) onChange(f);
       }}
     />
   </label>
@@ -52,8 +36,8 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [teams, setTeams] = useState<Array<{ id: string; name: string; category: string }>>([]);
-
+  const [teams, setTeams] = useState<Array<{id: string; name: string; category: string}>>([]);
+  
   // Cargar equipos disponibles
   useEffect(() => {
     const loadTeams = async () => {
@@ -70,77 +54,64 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
   //  - staff:       STAFF / otras funciones           → rol staff
   type AdultType = "responsible" | "senior" | "coach" | "staff";
   const ROLE_BY_TYPE: Record<AdultType, string> = {
-    responsible: "family",
-    senior: "senior",
-    coach: "coach",
-    staff: "staff",
+    responsible: "family", senior: "senior", coach: "coach", staff: "staff",
   };
 
   // Datos del adulto
   const [adult, setAdult] = useState({
-    firstName: "",
-    lastName: "",
-    birthDate: "",
-    docType: "DNI",
-    docNumber: "",
-    phone: "",
-    email: "",
-    adultType: "responsible" as AdultType,
+    firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "",
+    phone: "", email: "", adultType: "responsible" as AdultType,
   });
   const isResponsible = adult.adultType === "responsible";
   const isSenior = adult.adultType === "senior";
-
+  
   // Datos de hijos
-  const [children, setChildren] = useState<
-    Array<{
-      firstName: string;
-      lastName: string;
-      birthDate: string;
-      docNumber: string;
-      teamId: string;
-    }>
-  >([]);
-  const [currentChild, setCurrentChild] = useState({
-    firstName: "",
-    lastName: "",
-    birthDate: "",
-    docNumber: "",
-    teamId: "",
-  });
-
-  // Documentación
+  const [children, setChildren] = useState<Array<{firstName: string; lastName: string; birthDate: string; docNumber: string; teamId: string}>>([]);
+  const [currentChild, setCurrentChild] = useState({firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: ""});
+  
+  // Documentación (nombres para mostrar) + ficheros reales para subir
   const [docs, setDocs] = useState({
-    photo: "",
-    dniFront: "",
-    dniBack: "",
-    signature: "",
-    auth_image: false,
-    auth_travel: false,
-    auth_medical: false,
-    auth_data_sharing: false,
+    photo: "", dniFront: "", dniBack: "", signature: "", auth_image: false, auth_travel: false, auth_medical: false, auth_data_sharing: false
   });
+  const [docFiles, setDocFiles] = useState<Record<string, File>>({});
+
+  const handleDocFile = (field: "photo" | "dniFront" | "dniBack", file: File) => {
+    setDocFiles(prev => ({ ...prev, [field]: file }));
+    setDocs(prev => ({ ...prev, [field]: file.name }));
+  };
+
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const goFromStep1 = () => {
+    if (!adult.firstName.trim() || !adult.lastName.trim()) {
+      toast.error("Nombre y apellidos son obligatorios");
+      return;
+    }
+    if (!adult.docNumber.trim()) {
+      toast.error("El número de documento es obligatorio");
+      return;
+    }
+    if (!emailRe.test(adult.email.trim())) {
+      toast.error("Introduce un email válido");
+      return;
+    }
+    setStep(isResponsible ? 2 : 3);
+  };
 
   const handleAdultChange = (field: string, value: string | boolean) => {
-    setAdult((prev) => ({ ...prev, [field]: value }));
+    setAdult(prev => ({...prev, [field]: value}));
   };
 
   const handleChildChange = (field: string, value: string) => {
-    setCurrentChild((prev) => ({ ...prev, [field]: value }));
+    setCurrentChild(prev => ({...prev, [field]: value}));
   };
 
   const addChild = () => {
-    if (
-      !currentChild.firstName ||
-      !currentChild.lastName ||
-      !currentChild.birthDate ||
-      !currentChild.docNumber ||
-      !currentChild.teamId
-    ) {
+    if (!currentChild.firstName || !currentChild.lastName || !currentChild.birthDate || !currentChild.docNumber || !currentChild.teamId) {
       toast.error("Completa todos los datos del hijo (incluido el equipo)");
       return;
     }
     setChildren([...children, currentChild]);
-    setCurrentChild({ firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: "" });
+    setCurrentChild({firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: ""});
     toast.success("Hijo agregado");
   };
 
@@ -149,7 +120,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
   };
 
   const handleDocChange = (field: string, value: string | boolean) => {
-    setDocs((prev) => ({ ...prev, [field]: value }));
+    setDocs(prev => ({...prev, [field]: value}));
   };
 
   const submit = async () => {
@@ -183,20 +154,12 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       // 2. Si es responsable de menores, crear family_meta
       let familyId: string | null = null;
       if (isResponsible && children.length > 0) {
-        let { data: family } = await supabase
-          .from("families_meta")
-          .select("id")
-          .eq("head_profile_id", user.id)
-          .maybeSingle();
+        let { data: family } = await supabase.from("families_meta").select("id").eq("head_profile_id", user.id).maybeSingle();
         if (!family) {
-          const { data: newFamily, error: famErr } = await supabase
-            .from("families_meta")
-            .insert({
-              head_profile_id: user.id,
-              head_email: user.email,
-            })
-            .select()
-            .single();
+          const { data: newFamily, error: famErr } = await supabase.from("families_meta").insert({
+            head_profile_id: user.id,
+            head_email: user.email
+          }).select().single();
           if (famErr) throw famErr;
           family = newFamily;
         }
@@ -205,63 +168,54 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
 
       // 3. Subir archivos al storage
       const uploadFile = async (file: File, path: string) => {
-        const { data, error } = await supabase.storage
-          .from("player-docs")
-          .upload(path, file, { upsert: true });
+        const { data, error } = await supabase.storage.from("player-docs").upload(path, file, { upsert: true });
         if (error) throw error;
         return supabase.storage.from("player-docs").getPublicUrl(data.path).data.publicUrl;
       };
 
       const fileMap: Record<string, string> = {};
-      const fileInputs = document.querySelectorAll('input[type="file"]');
       const filesToUpload = [
         { key: "photo", label: "foto" },
         { key: "dniFront", label: "dni_anverso" },
-        { key: "dniBack", label: "dni_reverso" },
+        { key: "dniBack", label: "dni_reverso" }
       ];
 
-      for (let i = 0; i < fileInputs.length && i < filesToUpload.length; i++) {
-        const input = fileInputs[i] as HTMLInputElement;
-        const file = input.files?.[0];
+      for (const { key, label } of filesToUpload) {
+        const file = docFiles[key];
         if (file) {
-          const { key, label } = filesToUpload[i];
           const fileName = `${Date.now()}_${label}_${file.name}`;
           fileMap[key] = await uploadFile(file, `${user.id}/${fileName}`);
         }
       }
 
       // 4. Guardar registro del ADULTO en tabla registrations
-      const { data: adultReg, error: adultRegErr } = await supabase
-        .from("registrations")
-        .insert({
-          user_id: user.id,
-          type: "adult",
-          full_name: `${adult.firstName} ${adult.lastName}`,
-          doc_type: adult.docType,
-          doc_number: adult.docNumber,
-          birth_date: adult.birthDate || null,
-          phone: adult.phone,
-          email: adult.email,
-          photo_url: fileMap.photo || null,
-          dni_front_url: fileMap.dniFront || null,
-          dni_back_url: fileMap.dniBack || null,
-          signature_url: docs.signature || null,
-          auth_image: docs.auth_image,
-          auth_travel: docs.auth_travel,
-          auth_medical: docs.auth_medical,
-          auth_data_sharing: docs.auth_data_sharing,
-          family_id: familyId,
-          doc_status: "pending",
-        })
-        .select()
-        .single();
+      const { data: adultReg, error: adultRegErr } = await supabase.from("registrations").insert({
+        user_id: user.id,
+        type: "adult",
+        full_name: `${adult.firstName} ${adult.lastName}`,
+        doc_type: adult.docType,
+        doc_number: adult.docNumber,
+        birth_date: adult.birthDate || null,
+        phone: adult.phone,
+        email: adult.email,
+        photo_url: fileMap.photo || null,
+        dni_front_url: fileMap.dniFront || null,
+        dni_back_url: fileMap.dniBack || null,
+        signature_url: docs.signature || null,
+        auth_image: docs.auth_image,
+        auth_travel: docs.auth_travel,
+        auth_medical: docs.auth_medical,
+        auth_data_sharing: docs.auth_data_sharing,
+        family_id: familyId,
+        doc_status: "pending",
+      }).select().single();
       if (adultRegErr) throw adultRegErr;
 
       // 5. Guardar registros de MENORES en tabla registrations + players
       if (isResponsible && children.length > 0 && familyId) {
         for (const child of children) {
           // Insertar en registrations
-          await supabase.from("registrations").insert({
+          const { error: childRegErr } = await supabase.from("registrations").insert({
             user_id: user.id,
             type: "minor",
             full_name: `${child.firstName} ${child.lastName}`,
@@ -276,38 +230,22 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
             parent_registration_id: adultReg?.id || null,
             doc_status: "pending",
           });
+          if (childRegErr) throw childRegErr;
+
           // Insertar en players para gestión de equipos
-          await supabase.from("players").insert({
+          const { error: playerErr } = await supabase.from("players").insert({
             family_id: familyId,
             full_name: `${child.firstName} ${child.lastName}`,
             birth_date: child.birthDate,
             team_id: child.teamId || null,
           } as any);
+          if (playerErr) throw playerErr;
         }
 
-        // 6. Generar identificador automático de cuenta: Apellido.I-NN
-        const firstChild = children[0];
-        const apellido = firstChild.lastName
-          .split(" ")[0]
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "");
-        const inicial = firstChild.firstName.charAt(0).toUpperCase();
-        // Buscar cuántas familias ya tienen un reference_code con este prefijo
-        const prefix = `${apellido}.${inicial}-`;
-        const { data: existing } = await supabase
-          .from("families_meta")
-          .select("reference_code")
-          .like("reference_code", `${prefix}%`);
-        const seq = (existing?.length ?? 0) + 1;
-        const refCode = `${prefix}${String(seq).padStart(2, "0")}`;
-        await supabase
-          .from("families_meta")
-          .update({ reference_code: refCode } as any)
-          .eq("id", familyId);
       }
 
-      // 7. SENIOR: crear su propia ficha de jugador (adulto que es jugador).
-      //    Así cuotas, equipos y convocatorias funcionan igual que con cualquier
+      // 6. SENIOR: crear su propia ficha de jugador (adulto que es jugador) para
+      //    que cuotas, equipos y convocatorias funcionen igual que con cualquier
       //    jugador. Se vincula por players.user_id.
       if (isSenior) {
         const { data: existingSelf } = await supabase
@@ -321,19 +259,15 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
             birth_date: adult.birthDate || null,
             user_id: user.id,
           });
-          if (selfErr)
-            console.warn("No se pudo crear la ficha de jugador senior:", selfErr.message);
+          if (selfErr) console.warn("No se pudo crear la ficha de jugador senior:", selfErr.message);
         }
       }
 
-      // 8. Asignar el rol principal según el tipo elegido. Se hace vía RPC
-      //    SECURITY DEFINER porque un usuario no puede escribir en user_roles
-      //    directamente (RLS). Si el RPC aún no existe en la BD, el registro no
-      //    falla: el admin podrá ajustar el rol desde el panel de roles.
+      // 7. Asignar el rol principal según el tipo elegido, vía RPC SECURITY DEFINER
+      //    (un usuario no puede escribir en user_roles directamente por RLS). Si el
+      //    RPC aún no existe en la BD, el registro no falla: el admin ajustará el rol.
       const desiredRole = ROLE_BY_TYPE[adult.adultType];
-      const { error: roleErr } = await supabase.rpc("set_self_registration_role", {
-        _role: desiredRole,
-      } as any);
+      const { error: roleErr } = await supabase.rpc("set_self_registration_role", { _role: desiredRole } as any);
       if (roleErr) console.warn("No se pudo asignar el rol de registro:", roleErr.message);
 
       toast.success("Registro completado exitosamente");
@@ -341,27 +275,10 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
         onComplete();
       } else {
         setStep(1);
-        setAdult({
-          firstName: "",
-          lastName: "",
-          birthDate: "",
-          docType: "DNI",
-          docNumber: "",
-          phone: "",
-          email: "",
-          adultType: "responsible",
-        });
+        setAdult({firstName: "", lastName: "", birthDate: "", docType: "DNI", docNumber: "", phone: "", email: "", adultType: "responsible"});
         setChildren([]);
-        setDocs({
-          photo: "",
-          dniFront: "",
-          dniBack: "",
-          signature: "",
-          auth_image: false,
-          auth_travel: false,
-          auth_medical: false,
-          auth_data_sharing: false,
-        });
+        setDocs({photo: "", dniFront: "", dniBack: "", signature: "", auth_image: false, auth_travel: false, auth_medical: false, auth_data_sharing: false});
+        setDocFiles({});
       }
     } catch (err: any) {
       console.error("Error en registro:", err);
@@ -383,26 +300,17 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Nombre</Label>
-                <Input
-                  value={adult.firstName}
-                  onChange={(e) => handleAdultChange("firstName", e.target.value)}
-                />
+                <Input value={adult.firstName} onChange={(e) => handleAdultChange("firstName", e.target.value)} />
               </div>
               <div>
                 <Label>Apellidos</Label>
-                <Input
-                  value={adult.lastName}
-                  onChange={(e) => handleAdultChange("lastName", e.target.value)}
-                />
+                <Input value={adult.lastName} onChange={(e) => handleAdultChange("lastName", e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Tipo de Documento</Label>
-                <Select
-                  value={adult.docType}
-                  onValueChange={(v) => handleAdultChange("docType", v)}
-                >
+                <Select value={adult.docType} onValueChange={(v) => handleAdultChange("docType", v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -414,43 +322,26 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
               </div>
               <div>
                 <Label>Número de Documento</Label>
-                <Input
-                  value={adult.docNumber}
-                  onChange={(e) => handleAdultChange("docNumber", e.target.value)}
-                />
+                <Input value={adult.docNumber} onChange={(e) => handleAdultChange("docNumber", e.target.value)} />
               </div>
             </div>
             <div>
               <Label>Fecha de Nacimiento</Label>
-              <Input
-                type="date"
-                value={adult.birthDate}
-                onChange={(e) => handleAdultChange("birthDate", e.target.value)}
-              />
+              <Input type="date" value={adult.birthDate} onChange={(e) => handleAdultChange("birthDate", e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Teléfono</Label>
-                <Input
-                  value={adult.phone}
-                  onChange={(e) => handleAdultChange("phone", e.target.value)}
-                />
+                <Input value={adult.phone} onChange={(e) => handleAdultChange("phone", e.target.value)} />
               </div>
               <div>
                 <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={adult.email}
-                  onChange={(e) => handleAdultChange("email", e.target.value)}
-                />
+                <Input type="email" value={adult.email} onChange={(e) => handleAdultChange("email", e.target.value)} />
               </div>
             </div>
             <div>
               <Label>Tipo de usuario</Label>
-              <Select
-                value={adult.adultType}
-                onValueChange={(v) => handleAdultChange("adultType", v)}
-              >
+              <Select value={adult.adultType} onValueChange={(v) => handleAdultChange("adultType", v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -469,9 +360,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
                     : "Te registras como adulto del club. No se añaden menores ni cuotas."}
               </p>
             </div>
-            <Button onClick={() => setStep(isResponsible ? 2 : 3)} className="w-full">
-              Siguiente
-            </Button>
+            <Button onClick={goFromStep1} className="w-full">Siguiente</Button>
           </CardContent>
         </Card>
       )}
@@ -484,62 +373,35 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
           </CardHeader>
           <CardContent className="space-y-4">
             {children.map((child, idx) => (
-              <div
-                key={idx}
-                className="p-3 bg-surface rounded border border-border flex justify-between items-center"
-              >
-                <span>
-                  {child.firstName} {child.lastName}
-                </span>
-                <Button variant="destructive" size="sm" onClick={() => removeChild(idx)}>
-                  Eliminar
-                </Button>
+              <div key={idx} className="p-3 bg-surface rounded border border-border flex justify-between items-center">
+                <span>{child.firstName} {child.lastName}</span>
+                <Button variant="destructive" size="sm" onClick={() => removeChild(idx)}>Eliminar</Button>
               </div>
             ))}
             <div className="space-y-3 p-3 bg-muted rounded">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-sm">Nombre del menor</Label>
-                  <Input
-                    value={currentChild.firstName}
-                    onChange={(e) => handleChildChange("firstName", e.target.value)}
-                    size={1}
-                  />
+                  <Input value={currentChild.firstName} onChange={(e) => handleChildChange("firstName", e.target.value)} size={1} />
                 </div>
                 <div>
                   <Label className="text-sm">Apellidos</Label>
-                  <Input
-                    value={currentChild.lastName}
-                    onChange={(e) => handleChildChange("lastName", e.target.value)}
-                    size={1}
-                  />
+                  <Input value={currentChild.lastName} onChange={(e) => handleChildChange("lastName", e.target.value)} size={1} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-sm">Fecha de nacimiento</Label>
-                  <Input
-                    type="date"
-                    value={currentChild.birthDate}
-                    onChange={(e) => handleChildChange("birthDate", e.target.value)}
-                    size={1}
-                  />
+                  <Input type="date" value={currentChild.birthDate} onChange={(e) => handleChildChange("birthDate", e.target.value)} size={1} />
                 </div>
                 <div>
                   <Label className="text-sm">DNI/Documento</Label>
-                  <Input
-                    value={currentChild.docNumber}
-                    onChange={(e) => handleChildChange("docNumber", e.target.value)}
-                    size={1}
-                  />
+                  <Input value={currentChild.docNumber} onChange={(e) => handleChildChange("docNumber", e.target.value)} size={1} />
                 </div>
               </div>
               <div>
                 <Label className="text-sm">Equipo</Label>
-                <Select
-                  value={currentChild.teamId}
-                  onValueChange={(v) => handleChildChange("teamId", v)}
-                >
+                <Select value={currentChild.teamId} onValueChange={(v) => handleChildChange("teamId", v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar equipo" />
                   </SelectTrigger>
@@ -552,46 +414,24 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={addChild} variant="outline" className="w-full">
-                Agregar otro menor
-              </Button>
+              <Button onClick={addChild} variant="outline" className="w-full">Agregar otro menor</Button>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-                Atrás
-              </Button>
-              <Button
-                onClick={() => {
-                  // Auto-agregar hijo actual si tiene datos pero no se pulsó "Agregar"
-                  if (
-                    currentChild.firstName &&
-                    currentChild.lastName &&
-                    currentChild.birthDate &&
-                    currentChild.docNumber &&
-                    currentChild.teamId &&
-                    children.length === 0
-                  ) {
-                    setChildren([...children, currentChild]);
-                    setCurrentChild({
-                      firstName: "",
-                      lastName: "",
-                      birthDate: "",
-                      docNumber: "",
-                      teamId: "",
-                    });
-                  }
-                  setStep(3);
-                }}
-                className="flex-1"
-              >
-                Siguiente
-              </Button>
+              <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Atrás</Button>
+              <Button onClick={() => {
+                // Auto-agregar hijo actual si tiene datos pero no se pulsó "Agregar"
+                if (currentChild.firstName && currentChild.lastName && currentChild.birthDate && currentChild.docNumber && currentChild.teamId && children.length === 0) {
+                  setChildren([...children, currentChild]);
+                  setCurrentChild({firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: ""});
+                }
+                setStep(3);
+              }} className="flex-1">Siguiente</Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* PASO 3/4: Documentación */}
+    {/* PASO 3/4: Documentación */}
       {step === 3 && (
         <Card>
           <CardHeader>
@@ -600,61 +440,37 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
           <CardContent className="space-y-4">
             {/* Documentos del adulto */}
             <div className="space-y-3 p-3 rounded-lg border border-border bg-surface">
-              <p className="text-sm font-bold text-primary">
-                Documentos del adulto: {adult.firstName} {adult.lastName}
-              </p>
+              <p className="text-sm font-bold text-primary">Documentos del adulto: {adult.firstName} {adult.lastName}</p>
               <div>
                 <Label className="mb-2 block">Foto carnet</Label>
-                <FileButton
-                  label="Seleccionar foto"
-                  value={docs.photo}
-                  onChange={(name) => handleDocChange("photo", name)}
-                  accept="image/*"
-                />
+                <FileButton label="Seleccionar foto" value={docs.photo} onChange={(file) => handleDocFile("photo", file)} accept="image/*" />
               </div>
               <div>
                 <Label className="mb-2 block">DNI - Anverso</Label>
-                <FileButton
-                  label="Seleccionar archivo"
-                  value={docs.dniFront}
-                  onChange={(name) => handleDocChange("dniFront", name)}
-                  accept="image/*"
-                />
+                <FileButton label="Seleccionar archivo" value={docs.dniFront} onChange={(file) => handleDocFile("dniFront", file)} accept="image/*" />
               </div>
               <div>
                 <Label className="mb-2 block">DNI - Reverso</Label>
-                <FileButton
-                  label="Seleccionar archivo"
-                  value={docs.dniBack}
-                  onChange={(name) => handleDocChange("dniBack", name)}
-                  accept="image/*"
-                />
+                <FileButton label="Seleccionar archivo" value={docs.dniBack} onChange={(file) => handleDocFile("dniBack", file)} accept="image/*" />
               </div>
             </div>
 
             {/* Documentos de cada hijo (solo adulto responsable) */}
-            {isResponsible &&
-              children.length > 0 &&
-              children.map((child, idx) => (
-                <div key={idx} className="space-y-3 p-3 rounded-lg border border-border bg-surface">
-                  <p className="text-sm font-bold text-primary">
-                    Documentos del menor: {child.firstName} {child.lastName}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Los documentos de los menores se pueden aportar más adelante desde el panel de
-                    familia.
-                  </p>
-                </div>
-              ))}
+            {isResponsible && children.length > 0 && children.map((child, idx) => (
+              <div key={idx} className="space-y-3 p-3 rounded-lg border border-border bg-surface">
+                <p className="text-sm font-bold text-primary">Documentos del menor: {child.firstName} {child.lastName}</p>
+                <p className="text-xs text-muted-foreground">Los documentos de los menores se pueden aportar más adelante desde el panel de familia.</p>
+              </div>
+            ))}
 
             {/* Cuota del jugador SENIOR */}
             {isSenior && (
               <div className="space-y-1 p-3 rounded-lg border border-primary/30 bg-primary/5">
                 <p className="text-sm font-bold text-primary">Cuota de jugador Senior</p>
                 <p className="text-xs text-muted-foreground">
-                  Como jugador Senior se te asignará la cuota que te corresponde abonar. Podrás
-                  consultarla y subir tu justificante desde el apartado «Cuotas y pagos» de tu
-                  panel.
+                  Como jugador Senior se te asignará la cuota que te corresponde abonar.
+                  Podrás consultarla y subir tu justificante desde el apartado
+                  «Cuotas y pagos» de tu panel.
                 </p>
               </div>
             )}
@@ -662,70 +478,37 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
             {/* Autorizaciones */}
             <div className="space-y-3 p-3 bg-muted rounded">
               <p className="font-semibold text-sm">Autorizaciones</p>
-
+             
               {isResponsible && (
                 <>
                   <div className="flex items-start space-x-2">
-                    <Checkbox
-                      checked={docs.auth_image}
-                      onCheckedChange={(v) => handleDocChange("auth_image", v)}
-                    />
-                    <Label className="text-sm">
-                      Autorizo los derechos de imagen del menor en publicaciones del club.
-                    </Label>
+                    <Checkbox checked={docs.auth_image} onCheckedChange={(v) => handleDocChange("auth_image", v)} />
+                    <Label className="text-sm">Autorizo los derechos de imagen del menor en publicaciones del club.</Label>
                   </div>
                   <div className="flex items-start space-x-2">
-                    <Checkbox
-                      checked={docs.auth_travel}
-                      onCheckedChange={(v) => handleDocChange("auth_travel", v)}
-                    />
-                    <Label className="text-sm">
-                      Autorizo sus eventuales traslados en vehículos privados para partidos.
-                    </Label>
+                    <Checkbox checked={docs.auth_travel} onCheckedChange={(v) => handleDocChange("auth_travel", v)} />
+                    <Label className="text-sm">Autorizo sus eventuales traslados en vehículos privados para partidos.</Label>
                   </div>
                   <div className="flex items-start space-x-2">
-                    <Checkbox
-                      checked={docs.auth_medical}
-                      onCheckedChange={(v) => handleDocChange("auth_medical", v)}
-                    />
-                    <Label className="text-sm">
-                      Autorizo su asistencia médica en casos de emergencia que así lo requieran a
-                      juicio de los adultos responsables del menor en ese momento.
-                    </Label>
+                    <Checkbox checked={docs.auth_medical} onCheckedChange={(v) => handleDocChange("auth_medical", v)} />
+                    <Label className="text-sm">Autorizo su asistencia médica en casos de emergencia que así lo requieran a juicio de los adultos responsables del menor en ese momento.</Label>
                   </div>
                 </>
               )}
 
               <div className="flex items-start space-x-2 p-3 rounded border border-amber-500/50 bg-amber-500/10">
-                <Checkbox
-                  checked={docs.auth_data_sharing}
-                  onCheckedChange={(v) => handleDocChange("auth_data_sharing", v)}
-                />
-                <Label className="text-sm font-semibold text-foreground">
-                  Autorizo que se compartan nuestros datos personales con federaciones, seguros
-                  deportivos, entidades públicas de las que dependa nuestra actividad, compañías de
-                  transporte e instalaciones hoteleras en caso de viajes, y para cualquier otro uso
-                  legítimo requerido por el propio desarrollo de nuestra función esencial.
-                </Label>
+                <Checkbox checked={docs.auth_data_sharing} onCheckedChange={(v) => handleDocChange("auth_data_sharing", v)} />
+                <Label className="text-sm font-semibold text-foreground">Autorizo que se compartan nuestros datos personales con federaciones, seguros deportivos, entidades públicas de las que dependa nuestra actividad, compañías de transporte e instalaciones hoteleras en caso de viajes, y para cualquier otro uso legítimo requerido por el propio desarrollo de nuestra función esencial.</Label>
               </div>
             </div>
 
             <div>
               <Label className="mb-2 block">Firma del adulto responsable</Label>
-              <SignaturePad
-                value={docs.signature}
-                onChange={(sig) => handleDocChange("signature", sig || "")}
-              />
+              <SignaturePad value={docs.signature} onChange={(sig) => handleDocChange("signature", sig || "")} />
             </div>
 
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setStep(isResponsible ? 2 : 1)}
-                className="flex-1"
-              >
-                Atrás
-              </Button>
+              <Button variant="outline" onClick={() => setStep(isResponsible ? 2 : 1)} className="flex-1">Atrás</Button>
               <Button onClick={submit} disabled={isSubmitting} className="flex-1">
                 {isSubmitting ? "Enviando..." : "Completar Registro"}
               </Button>
