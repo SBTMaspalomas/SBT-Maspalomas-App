@@ -90,7 +90,9 @@ con RLS (admin/coach gestionan; jugador/familia leen lo suyo). Retirado `localSt
 ### 🧱 Deuda técnica transversal (bloqueante)
 
 - ✅ **Versionar tipos y migraciones** de `registrations`, `payments`, `convocatorias`, `convocatoria_responses`; regenerar `src/integrations/supabase/types.ts` y eliminar los `as any`. *(Hecho en Fase 0.)*
-- **Cartelera/Tablón general** (`NewsBoard`) sigue como placeholder; `Board.tsx` y `PlayersList.tsx` existen pero no están enlazados en la navegación.
+- ✅ **Cartelera/Tablón general** (`NewsBoard`) implementada contra Supabase (tabla
+  `announcements`, RLS + Realtime) y enlazada en la navegación; el `Board.tsx` demo
+  se retiró. Queda `PlayersList.tsx`, que existe pero no está enlazado en la navegación.
 
 ---
 
@@ -139,8 +141,13 @@ Es el núcleo deportivo del que dependen Convocatorias, Jornada y Cartelera.
 2. ✅ Formulario de tallas condicional al nivel del equipo (`teams.travels` + `equipment_sizes` + `EquipmentSizes.tsx`).
 3. ⏳ Tienda/merchandising + consola de pedidos del admin con export a Excel — **pendiente** (fuera del alcance actual).
 
-### Fase 6 — Cartelera/Tablón definitivo · *media* — ~2-3 días
-1. Consolidar `NewsBoard`/`Board` en una cartelera real contra Supabase y enlazarla en navegación.
+### Fase 6 — Cartelera/Tablón definitivo · *media* — ✅ **Completada**
+1. ✅ Consolidada en una cartelera real contra Supabase: tabla `announcements`
+   (título, cuerpo, `pinned`, `author_id`) con RLS (admin/coach publican/editan/
+   borran; cualquier autenticado lee) y Realtime. `NewsBoard.tsx` reescrito
+   (antes *"Próximamente"*) con formulario de publicación para admin/coach, fijado
+   de avisos y refresco en vivo; enlazado ya en la navegación (vista `cartelera`).
+   Retirado el `Board.tsx` demo (sobre `clubStore`), ahora obsoleto.
 
 ### Fase 7 — Fases en reserva · *baja / cuando el MVP esté cerrado*
 1. **Galería Multimedia** con RLS por categoría — ~4-5 días.
