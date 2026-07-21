@@ -28,6 +28,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.payments TO authenticated;
 GRANT ALL ON public.payments TO service_role;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
+-- Limpieza de políticas heredadas: en la BD viva existían duplicados "solo
+-- familia" (payments_select_own_family / payments_update_own_family) creados
+-- fuera de migraciones. Son un subconjunto estricto de las políticas *_own de
+-- abajo (que cubren family_id Y el player_id del jugador Senior), así que se
+-- retiran para dejar un único juego coherente. En una BD nueva es un no-op.
+DROP POLICY IF EXISTS "payments_select_own_family" ON public.payments;
+DROP POLICY IF EXISTS "payments_update_own_family" ON public.payments;
+
 -- El administrador gestiona todas las cuotas (crear, cambiar estado, etc.).
 DROP POLICY IF EXISTS "payments_admin_all" ON public.payments;
 CREATE POLICY "payments_admin_all"
