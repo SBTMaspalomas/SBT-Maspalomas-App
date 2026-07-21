@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 type AttendanceStatus = "present" | "late" | "absent";
 type AbsenceReason = "justified" | "unjustified";
@@ -15,18 +16,16 @@ type AttendanceMap = Record<string, Record<string, DayEntry>>; // playerId -> da
 interface TeamRow { id: string; name: string; category: string }
 interface PlayerRow { id: string; full_name: string; team_id: string | null }
 
-const STORAGE_KEY = "attendance_v2";
-
 const keyOf = (value: string | null | undefined) => value?.trim().toLowerCase() ?? "";
 
-function loadAttendance(): AttendanceMap {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as AttendanceMap; }
-  catch { return {}; }
-}
-function saveAttendance(m: AttendanceMap) {
-  if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, JSON.stringify(m));
-}
+// Traducción entre el estado de UI (status + absentReason) y la fila de la
+// tabla `attendance` de Supabase.
+type AttendanceRow = {
+  player_id: string;
+  date: string;
+  status: AttendanceStatus;
+  absent_reason: AbsenceReason | null;
+};
 
 export function Attendance() {
   const { user, role } = useAuth();
@@ -35,7 +34,8 @@ export function Attendance() {
   const [teamId, setTeamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [attendance, setAttendance] = useState<AttendanceMap>(() => loadAttendance());
+  const [attendance, setAttendance] = useState<AttendanceMap>({});
+  const [saving, setSaving] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
@@ -99,14 +99,69 @@ export function Attendance() {
     return players.filter((p) => p.team_id ? teamKeys.has(keyOf(p.team_id)) : false);
   }, [players, selectedTeam]);
 
-  const updateEntry = (playerId: string, patch: Partial<DayEntry>) => {
-    setAttendance((prev) => {
-      const forPlayer = { ...(prev[playerId] ?? {}) };
-      forPlayer[date] = { ...(forPlayer[date] ?? {}), ...patch };
-      const next = { ...prev, [playerId]: forPlayer };
-      saveAttendance(next);
-      return next;
-    });
+  // Cargar el histórico de asistencia del equipo seleccionado desde Supabase.
+  // Se carga todo el histórico del equipo (volumen modesto) para conservar el
+  // comportamiento previo: editar fechas pasadas y calcular el resumen mensual.
+  useEffect(() => {
+    if (!teamId) { setAttendance({}); return; }
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("player_id, date, status, absent_reason")
+        .eq("team_id", teamId);
+      if (!active) return;
+      if (error) { setAttendance({}); return; }
+      const map: AttendanceMap = {};
+      ((data ?? []) as AttendanceRow[]).forEach((r) => {
+        const forPlayer = map[r.player_id] ?? (map[r.player_id] = {});
+        forPlayer[r.date] = {
+          status: r.status,
+          absentReason: r.status === "absent" ? (r.absent_reason ?? "unjustified") : undefined,
+        };
+      });
+      setAttendance(map);
+    })();
+    return () => { active = false; };
+  }, [teamId]);
+
+  // Persiste una marca (upsert por player_id+team_id+date) con actualización
+  // optimista del estado local y reversión si Supabase falla.
+  const updateEntry = async (playerId: string, patch: Partial<DayEntry>) => {
+    if (!user || !teamId) return;
+    const prevEntry = attendance[playerId]?.[date] ?? {};
+    const merged: DayEntry = { ...prevEntry, ...patch };
+    if (!merged.status) return;
+    const absentReason: AbsenceReason | undefined =
+      merged.status === "absent" ? (merged.absentReason ?? "unjustified") : undefined;
+    const nextEntry: DayEntry = { status: merged.status, absentReason };
+
+    setAttendance((prev) => ({
+      ...prev,
+      [playerId]: { ...(prev[playerId] ?? {}), [date]: nextEntry },
+    }));
+
+    setSaving(true);
+    const { error } = await supabase.from("attendance").upsert(
+      {
+        player_id: playerId,
+        team_id: teamId,
+        date,
+        status: merged.status,
+        absent_reason: absentReason ?? null,
+        recorded_by: user.id,
+      },
+      { onConflict: "player_id,team_id,date" },
+    );
+    setSaving(false);
+
+    if (error) {
+      toast.error("No se pudo guardar la asistencia");
+      setAttendance((prev) => ({
+        ...prev,
+        [playerId]: { ...(prev[playerId] ?? {}), [date]: prevEntry as DayEntry },
+      }));
+    }
   };
 
   const setStatus = (playerId: string, status: AttendanceStatus) => {
@@ -158,7 +213,10 @@ export function Attendance() {
       <Card className="border-border/60 shadow-sm">
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-xl">Control de asistencia</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-xl">Control de asistencia</CardTitle>
+              {saving && <span className="text-xs text-muted-foreground">Guardando…</span>}
+            </div>
             <Select value={teamId} onValueChange={setTeamId}>
               <SelectTrigger className="w-full sm:w-56">
                 <SelectValue placeholder="Selecciona equipo" />

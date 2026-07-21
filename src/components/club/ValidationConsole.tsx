@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, Clock, Download, User, Users, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Download, User, Users, RefreshCw, FileText } from "lucide-react";
 
 interface Registration {
   id: string;
@@ -36,9 +36,11 @@ interface Registration {
   dni_front_status: string | null;
   dni_back_status: string | null;
   signature_status: string | null;
+  federativa_pdf_url: string | null;
+  federativa_status: string | null;
 }
 
-type DocField = "photo_status" | "dni_front_status" | "dni_back_status" | "signature_status";
+type DocField = "photo_status" | "dni_front_status" | "dni_back_status" | "signature_status" | "federativa_status";
 type DocStatus = "pending" | "approved" | "rejected";
 
 const statusUI = {
@@ -53,6 +55,7 @@ const DOC_LABELS: Record<DocField, string> = {
   dni_front_status: "DNI Anverso",
   dni_back_status: "DNI Reverso",
   signature_status: "Firma",
+  federativa_status: "Ficha Federativa",
 };
 
 const DOC_URL_MAP: Record<DocField, keyof Registration> = {
@@ -60,11 +63,20 @@ const DOC_URL_MAP: Record<DocField, keyof Registration> = {
   dni_front_status: "dni_front_url",
   dni_back_status: "dni_back_url",
   signature_status: "signature_url",
+  federativa_status: "federativa_pdf_url",
 };
+
+// Documentos que se muestran y validan por registro. La ficha federativa se
+// muestra siempre, pero sólo bloquea el estado global cuando ya se ha subido.
+const DOC_FIELDS: DocField[] = [
+  "photo_status", "dni_front_status", "dni_back_status", "signature_status", "federativa_status",
+];
 
 function computeOverallStatus(reg: Registration): DocStatus {
   const fields: DocField[] = ["photo_status", "dni_front_status", "dni_back_status", "signature_status"];
   const statuses = fields.map((f) => reg[f] || "pending");
+  // La ficha federativa sólo cuenta para el semáforo global si ya hay PDF subido.
+  if (reg.federativa_pdf_url) statuses.push((reg.federativa_status as DocStatus) || "pending");
   if (statuses.some((s) => s === "rejected")) return "rejected";
   if (statuses.every((s) => s === "approved")) return "approved";
   return "pending";
@@ -133,16 +145,20 @@ export function ValidationConsole() {
 
   const approveAll = async (id: string) => {
     setSavingField(`${id}-all`);
+    const reg = registrations.find((r) => r.id === id);
+    const updateData: TablesUpdate<"registrations"> = {
+      photo_status: "approved",
+      dni_front_status: "approved",
+      dni_back_status: "approved",
+      signature_status: "approved",
+      doc_status: "approved",
+      reject_reason: null,
+    };
+    // Sólo se aprueba la ficha federativa si ya se ha subido el PDF.
+    if (reg?.federativa_pdf_url) updateData.federativa_status = "approved";
     const { error } = await supabase
       .from("registrations")
-      .update({
-        photo_status: "approved",
-        dni_front_status: "approved",
-        dni_back_status: "approved",
-        signature_status: "approved",
-        doc_status: "approved",
-        reject_reason: null,
-      })
+      .update(updateData)
       .eq("id", id);
     if (error) { toast.error("Error"); setSavingField(null); return; }
     toast.success("Todos los documentos aprobados");
@@ -254,12 +270,14 @@ export function ValidationConsole() {
               <div className="space-y-3">
                 <h3 className="font-medium text-sm">Documentos (aprobación individual)</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {(["photo_status", "dni_front_status", "dni_back_status", "signature_status"] as DocField[]).map((field) => {
+                  {DOC_FIELDS.map((field) => {
                     const url = selected[DOC_URL_MAP[field]] as string | null;
                     const status = (selected[field] || "pending") as DocStatus;
                     const S = statusUI[status] || defaultStatus;
                     const SIcon = S.icon;
                     const isSaving = savingField === `${selected.id}-${field}`;
+                    // La ficha federativa es un PDF: no se puede previsualizar con <img>.
+                    const isPdf = field === "federativa_status" || (!!url && url.toLowerCase().endsWith(".pdf"));
                     return (
                       <div key={field} className="rounded-lg border border-border bg-background p-3 space-y-2">
                         <div className="flex items-center justify-between">
@@ -267,14 +285,21 @@ export function ValidationConsole() {
                           <Badge variant="outline" className={`text-[10px] ${S.cls}`}><SIcon className="mr-1 h-2.5 w-2.5" />{S.label}</Badge>
                         </div>
                         {url ? (
-                          <div className="relative group">
-                            <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted overflow-hidden">
-                              <img src={url} alt={DOC_LABELS[field]} className="w-full h-full object-cover rounded" />
-                            </div>
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition rounded">
-                              <Download className="h-4 w-4 text-white" />
+                          isPdf ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded bg-muted text-muted-foreground transition hover:text-foreground">
+                              <FileText className="h-8 w-8" />
+                              <span className="inline-flex items-center gap-1 text-xs"><Download className="h-3 w-3" /> Abrir PDF</span>
                             </a>
-                          </div>
+                          ) : (
+                            <div className="relative group">
+                              <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted overflow-hidden">
+                                <img src={url} alt={DOC_LABELS[field]} className="w-full h-full object-cover rounded" />
+                              </div>
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition rounded">
+                                <Download className="h-4 w-4 text-white" />
+                              </a>
+                            </div>
+                          )
                         ) : (
                           <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted text-muted-foreground text-xs">No aportado</div>
                         )}

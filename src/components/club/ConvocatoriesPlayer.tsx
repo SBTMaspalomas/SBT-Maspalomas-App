@@ -10,7 +10,7 @@ import { Calendar, MapPin, CheckCircle, AlertCircle, Clock } from "lucide-react"
 
 interface Convocatoria {
   id: string;
-  team_id: string;
+  team_id: string | null;
   type: "training" | "match";
   date: string;
   time: string;
@@ -18,6 +18,8 @@ interface Convocatoria {
   notes: string | null;
   team_name?: string;
 }
+
+const keyOf = (value: string | null | undefined) => value?.trim().toLowerCase() ?? "";
 
 interface PlayerResponse {
   id: string;
@@ -44,29 +46,52 @@ export function ConvocatoriesPlayer({ playerId: playerIdProp }: { playerId?: str
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    // Get convocatorias for player's team
-    const { data: convData, error: convErr } = await supabase
-      .from("convocatorias")
-      .select("*")
-      .order("date", { ascending: false });
-    if (convErr) console.error("ConvocatoriesPlayer: error cargando convocatorias", convErr);
-
-    // Get ONLY this player's responses
-    let respData: any[] = [];
-    if (playerId) {
-      const { data, error: respErr } = await supabase
-        .from("convocatoria_responses")
-        .select("*")
-        .eq("player_id", playerId);
-      if (respErr) console.error("ConvocatoriesPlayer: error cargando respuestas", respErr);
-      respData = data || [];
+    if (!playerId) {
+      setConvocatorias([]);
+      setResponses(new Map());
+      setLoading(false);
+      return;
     }
 
-    setConvocatorias((convData || []) as Convocatoria[]);
+    // Cargar en paralelo: todas las convocatorias (RLS permite lectura), la
+    // pertenencia del jugador a equipos, los equipos (para resolver nombre/uuid),
+    // las convocatorias en las que le han doblado y sus propias respuestas.
+    const [
+      { data: convData, error: convErr },
+      { data: playerRow },
+      { data: playerTeamsData },
+      { data: teamsData },
+      { data: extraData },
+      { data: respRows },
+    ] = await Promise.all([
+      supabase.from("convocatorias").select("*").order("date", { ascending: false }),
+      supabase.from("players").select("team_id").eq("id", playerId).maybeSingle(),
+      supabase.from("player_teams").select("team_id").eq("player_id", playerId),
+      supabase.from("teams").select("id, name, category"),
+      supabase.from("convocatoria_extra_players").select("convocatoria_id").eq("player_id", playerId),
+      supabase.from("convocatoria_responses").select("*").eq("player_id", playerId),
+    ]);
+    if (convErr) console.error("ConvocatoriesPlayer: error cargando convocatorias", convErr);
+
+    const myTeamUuids = new Set<string>((playerTeamsData ?? []).map((r) => r.team_id));
+    const myLegacyKey = keyOf(playerRow?.team_id ?? null);
+    const teams = (teamsData ?? []) as { id: string; name: string; category: string }[];
+    const extraConvIds = new Set<string>((extraData ?? []).map((r) => r.convocatoria_id));
+
+    const belongs = (conv: Convocatoria): boolean => {
+      if (extraConvIds.has(conv.id)) return true;
+      if (conv.team_id && myTeamUuids.has(conv.team_id)) return true;
+      const convTeam = teams.find((t) => t.id === conv.team_id);
+      const convKeys = new Set([keyOf(conv.team_id), keyOf(convTeam?.name), keyOf(convTeam?.category)]);
+      return myLegacyKey !== "" && convKeys.has(myLegacyKey);
+    };
+
+    const visible = ((convData || []) as Convocatoria[]).filter(belongs);
+    setConvocatorias(visible);
 
     const respMap = new Map<string, PlayerResponse>();
-    respData.forEach((r: any) => {
-      respMap.set(r.convocatoria_id, r);
+    (respRows ?? []).forEach((r) => {
+      respMap.set(r.convocatoria_id, r as PlayerResponse);
     });
     setResponses(respMap);
     setLoading(false);

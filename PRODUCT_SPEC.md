@@ -2,7 +2,7 @@
 
 > Documento técnico-funcional que describe **todo lo implementado** en la aplicación de gestión del club de baloncesto **SBT Maspalomas** ("El Baloncesto en el Sur · Gran Canaria").
 >
-> Última revisión del código: **2026-07-21**. Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0** (versionado en migraciones de `registrations`, `payments`, `convocatorias` y `convocatoria_responses`, con retirada de los accesos `as any`).
+> Última revisión del código: **2026-07-21** (rama `claude/plan-roadmap-phases-2-5-53sozm`). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade además las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo.
 >
 > El plan de lo que **falta** por construir frente al plan de inicio del proyecto vive en un documento aparte, [`ROADMAP.md`](./ROADMAP.md).
 
@@ -195,9 +195,9 @@ Al enviar:
 Consola de revisión de todos los `registrations`:
 - Filtros por estado: **todos / pendientes / aprobados / rechazados**, con contadores.
 - Lista de registros (adulto/menor) con estado global calculado.
-- **Aprobación granular por documento**: foto, DNI anverso, DNI reverso y firma tienen estado propio (`photo_status`, `dni_front_status`, `dni_back_status`, `signature_status`). El estado global se deriva: *rechazado* si alguno lo está, *aprobado* si todos lo están, si no *pendiente*.
-- Vista previa de imágenes con enlace de descarga.
-- Botones de aprobar/rechazar por documento, campo de **motivo de rechazo**, y acción **"Aprobar todos"**.
+- **Aprobación granular por documento**: foto, DNI anverso, DNI reverso, firma y **Ficha Federativa** tienen estado propio (`photo_status`, `dni_front_status`, `dni_back_status`, `signature_status`, `federativa_status`). El estado global se deriva: *rechazado* si alguno lo está, *aprobado* si todos lo están, si no *pendiente*. La **Ficha Federativa** solo cuenta para el estado global cuando ya se ha subido el PDF (`federativa_pdf_url` no nulo); mientras no se aporte no bloquea la validación del resto.
+- Vista previa de imágenes con enlace de descarga; la Ficha Federativa, al ser PDF, se muestra como tarjeta con enlace **"Abrir PDF"** (no se previsualiza como imagen).
+- Botones de aprobar/rechazar por documento, campo de **motivo de rechazo**, y acción **"Aprobar todos"** (que aprueba también la ficha federativa si hay PDF subido).
 - Muestra el estado de las autorizaciones firmadas.
 
 ### 7.3 Gestión de pagos — `Payments.tsx`
@@ -238,6 +238,7 @@ CRUD de equipos (`teams`): crear, editar y eliminar (nombre + categoría). Cada 
 - Lista de todos los `players` con su equipo oficial.
 - Aviso destacado de jugadores **sin equipo asignado**.
 - Diálogo para asignar/remover equipo por jugador (actualiza `players.team_id`).
+- En cada badge de equipo se muestra el **dorsal** asignado (`#N`) cuando existe, leído de `player_teams.dorsal` (ver §7.17).
 
 ### 7.6 Gestión de miembros y roles — `RoleManager.tsx` (solo admin)
 
@@ -250,9 +251,11 @@ Panel de administración de usuarios registrados:
 
 ### 7.7 Convocatorias — `ConvocatoriesManager.tsx` (admin/coach) y `ConvocatoriesPlayer.tsx` (player)
 
-**Manager**: creación de convocatorias (`convocatorias`) de tipo **entrenamiento** o **partido**, con equipo, fecha, hora, lugar y notas. Lista con estadísticas de respuestas (confirmados / con problemas / pendientes) y borrado.
+**Manager**: creación de convocatorias (`convocatorias`) de tipo **entrenamiento** o **partido**, con equipo, fecha, hora, lugar, notas y **mínimo de jugadores exigido en acta** (`min_players`, opcional). Cada tarjeta muestra el **roster** (jugadores del equipo, resuelto por `players.team_id` y `player_teams`) con el **contador de confirmados** `X / mínimo`, que se pinta en **rojo** cuando no se alcanza el mínimo federativo. Un diálogo de **detalle** lista jugador a jugador su estado (confirmado / problema / pendiente) y permite:
+- **"Doblar"** jugadores de otras categorías autorizados a jugar con el equipo (se guardan en `convocatoria_extra_players`; aparecen en el roster con la etiqueta *Doblado* y pueden retirarse).
+- **Refresco en vivo** de respuestas y doblados mediante **Supabase Realtime** (canal suscrito a `convocatoria_responses` y `convocatoria_extra_players` filtrados por la convocatoria abierta).
 
-**Player**: lista de convocatorias con opción de **confirmar asistencia** o **reportar un problema** (llegaré tarde / no puedo asistir / lesión / otro, con notas). Las respuestas se guardan en `convocatoria_responses`.
+**Player**: lista **filtrada** a las convocatorias que le corresponden — las de su(s) equipo(s) (por `players.team_id` o `player_teams`) o aquellas en las que le han **doblado** (`convocatoria_extra_players`) — con opción de **confirmar asistencia** o **reportar un problema** (llegaré tarde / no puedo asistir / lesión / otro, con notas). Las respuestas se guardan en `convocatoria_responses`.
 
 Los identificadores se integran con el contexto de auth: `convocatorias.created_by` toma `user.id` del `useAuth`, y `convocatoria_responses.player_id` el jugador del perfil activo (el `childId` del perfil hijo o el `selfPlayerId` del jugador Senior).
 
@@ -261,8 +264,7 @@ Los identificadores se integran con el contexto de auth: `convocatorias.created_
 - Selector de equipo (los equipos vienen de `coach_teams`; el admin ve todos) y selector de fecha (no permite fechas futuras).
 - Por jugador del equipo: marcar **Asiste / Retraso / Falta**. En caso de falta, motivo **justificada / injustificada**.
 - Resumen mensual de **retrasos / presencias / ausencias** por jugador.
-
-> ⚠️ *Nota técnica*: la asistencia se persiste en **`localStorage`** (`attendance_v2`), aún no en Supabase.
+- **Persistencia en Supabase** (tabla `attendance`): la marca se guarda con **upsert** por `(player_id, team_id, date)` de forma optimista (con reversión si falla) y firma `recorded_by = auth.uid()`. Al cambiar de equipo se recarga su histórico completo, sobre el que se calcula el resumen mensual.
 
 ### 7.9 Vista de jugador/familia — `PlayerView.tsx`
 
@@ -335,6 +337,29 @@ Consola que da al administrador control sobre el **ciclo de vida de cada canal**
 
 Por cada canal ofrece: **activar/desactivar** (`enabled`), cambiar el **estado** (`open` = abierto · `closed` = solo lectura · `archived` = archivado/oculto) y **eliminar** — que borra el **historial de mensajes** (`team_messages` filtrados por `channel_type`/`team_id`) y deja el canal desactivado, con diálogo de confirmación por ser irreversible. La lógica de claves y estado efectivo se comparte con el visor vía `lib/chatChannels.ts`.
 
+### 7.16 Ficha Federativa PDF — `FederativaDoc.tsx` (family/senior)
+
+Flujo de la **Ficha Federativa Única** que complementa al registro documental:
+- Botón **"Descargar plantilla oficial"** (constante `FEDERATIVA_TEMPLATE_URL`, *placeholder configurable*: mientras no se publique el PDF oficial del club, el botón queda deshabilitado con una nota).
+- Por cada `registrations` del usuario (adulto + menores), **subida del PDF firmado** tras el reconocimiento médico (`accept="application/pdf"`, a Storage `player-docs/${uid}/federativa_...pdf`). Al subir, se fija `federativa_pdf_url` y `federativa_status = 'pending'`.
+- Badge de estado (**en revisión / aprobada / rechazada**) y enlace para ver el PDF subido.
+
+El admin la valida como un documento más en `ValidationConsole` (§7.2). La escritura del PDF por parte de la familia se apoya en la política `registrations_update_own` añadida en esta fase.
+
+### 7.17 Dorsales — `DorsalManager.tsx` (coach/admin)
+
+- Selector de equipo (mismos equipos que en Asistencia: `coach_teams` para el coach, todos para el admin).
+- Por jugador del equipo, campo de **dorsal** con guardado individual.
+- El dorsal es **único dentro de cada equipo** (índice parcial `UNIQUE(team_id, dorsal)` en `player_teams`); al intentar duplicarlo se muestra un error claro.
+- El guardado se hace vía **RPC `set_player_dorsal(_player_id, _team_id, _dorsal)`** (`SECURITY DEFINER`), que valida que el llamante es admin o coach y hace **upsert** del vínculo `player_teams`. Así los entrenadores asignan dorsales **sin** obtener permiso de escritura para reasignar equipos (que sigue siendo tarea del admin). Pasar dorsal vacío lo borra.
+
+### 7.18 Tallas / Equipación — `EquipmentSizes.tsx` (family/senior)
+
+Formulario de tallas por jugador **condicional al nivel del equipo**:
+- Si alguno de los equipos del jugador tiene `teams.travels = true` (**"equipo que viaja"**, configurable en `TeamsManager`), se muestra el **pack completo**: equipación reversible, chándal, polo de paseo, sudadera y mochila reglamentaria.
+- Si el jugador solo juega liga local, se muestra **solo la equipación reversible**.
+- Las tallas se guardan (upsert por `player_id`) en la tabla `equipment_sizes`. La familia gestiona las de sus hijos/as; el jugador Senior las suyas (`selfPlayerId`). Admin/coach pueden leerlas (para la futura logística de pedidos del Módulo 9 completo).
+
 ---
 
 ## 8. Capa de datos (Supabase)
@@ -352,27 +377,31 @@ Tablas con **Row Level Security (RLS)** activada:
 | `profiles` | Perfil de usuario (email, nombre, avatar, teléfono) | Lectura/edición propia; admin lee todos |
 | `user_roles` | Roles por usuario (enum `app_role`) | Lectura propia; admin gestiona todos |
 | `coach_teams` | Equipos asignados a un entrenador | Admin gestiona; coach lee lo suyo |
-| `teams` | Equipos (nombre, categoría, `age_category`) | Lectura para autenticados; admin gestiona |
+| `teams` | Equipos (nombre, categoría, `age_category`, `travels`) | Lectura para autenticados; admin gestiona |
 | `players` | Jugadores (nombre, fecha nac., `team_id`, `family_id`, `avatar_url`, `user_id`) | Familia lee/edita sus hijos; el propio jugador Senior gestiona su ficha (`user_id = auth.uid()`); coach lee todos; admin gestiona |
-| `player_teams` | Puente jugador↔equipo (**multi-equipo**) | Lectura autenticados; admin gestiona |
+| `player_teams` | Puente jugador↔equipo (**multi-equipo**) + `dorsal` (único por equipo) | Lectura autenticados; admin gestiona; dorsal vía RPC `set_player_dorsal` |
 | `families_meta` | Ficha de familia (head, email, `reference_code`, `adult_pin`) | Familia lee/gestiona la suya; admin todo |
 | `standings` | Clasificación por equipo | Lectura autenticados; admin gestiona |
 | `club_events` | Eventos del club (torneos, campus…) | Lectura autenticados; admin gestiona |
 | `team_messages` | Mensajes de canales team/family/broadcast/admins/coaches/staff | Controlado por `user_can_access_team_channel` + `chat_channel_open`; admin puede borrar |
 | `chat_channels` | Config/estado de cada canal (`channel_key`, `kind`, `enabled`, `status`) | Lectura autenticados; gestión solo admin |
 | `private_messages` | Mensajes privados admin↔familia | Solo admin y familia receptora; admin puede borrar |
-| `registrations` | Registros federativos (adulto/menor, docs, autorizaciones, estados por documento) | Admin gestiona todo; cada usuario ve/inserta los suyos (`user_id = auth.uid()`) |
+| `registrations` | Registros federativos (adulto/menor, docs, autorizaciones, estados por documento, `federativa_pdf_url`/`federativa_status`) | Admin gestiona todo; cada usuario ve/inserta/**actualiza** los suyos (`user_id = auth.uid()`) |
 | `payments` | Cuotas y pagos (importe, periodo, estado, comprobante) | Admin gestiona; familia/jugador ven y actualizan los suyos (por `family_id` o `players.user_id`) |
 | `fee_schedules` | Importes y fechas límite de cada tipo de cuota (senior/federado/escuela) | Admin edita; todos leen |
-| `convocatorias` | Convocatorias de entreno/partido | Admin/coach gestionan; autenticados leen |
+| `convocatorias` | Convocatorias de entreno/partido (+ `min_players`) | Admin/coach gestionan; autenticados leen |
 | `convocatoria_responses` | Respuestas de jugadores a convocatorias | Admin/coach todo; jugador/familia gestionan la suya |
+| `convocatoria_extra_players` | Jugadores "doblados" en una convocatoria | Admin/coach gestionan; jugador/familia leen lo suyo |
+| `attendance` | Asistencia por jugador/equipo/día (`status`, `absent_reason`) | Admin/coach gestionan (`recorded_by = auth.uid()`); jugador/familia leen lo suyo |
+| `equipment_sizes` | Tallas de equipación por jugador | Familia/senior gestionan lo suyo; admin/coach leen |
 
-Todas estas tablas están **versionadas en `supabase/migrations/`** desde el saneamiento de la **Fase 0** (migraciones `20260721090000`–`20260721090300`) y **tipadas en `src/integrations/supabase/types.ts`** sin accesos `as any`.
+Estas tablas están **versionadas en `supabase/migrations/`** desde el saneamiento de la **Fase 0** (migraciones `20260721090000`–`20260721090300`) y las **Fases 2-5** (migraciones `20260722100000`–`20260722100300`), y **tipadas en `src/integrations/supabase/types.ts`** sin accesos `as any`.
 
 **Funciones y triggers relevantes**:
 - `handle_new_user()` — crea `profiles` + rol por defecto (`family`, o `admin` para emails bootstrap) y auto-vincula familias por email.
 - `has_role(user, role)` — helper `SECURITY DEFINER` usado en las políticas RLS.
 - `set_self_registration_role()` — RPC `SECURITY DEFINER` que fija el rol principal del propio usuario al terminar el registro (responsable/senior/coach/staff).
+- `set_player_dorsal(_player_id, _team_id, _dorsal)` — RPC `SECURITY DEFINER` que fija el dorsal de un jugador en un equipo (upsert en `player_teams`); solo admin/coach, con dorsal único por equipo.
 - `compute_family_reference_code()` + trigger `refresh_family_reference_code` — genera el código de familia a partir del hijo mayor.
 - `derive_age_category()` — deriva `U12` / `U14+` a partir de la categoría del equipo.
 - `user_can_access_team_channel()` — autoriza acceso a canales de chat (menores U12 sin chat de equipo; canales de rol `admins`/`coaches`/`staff`).
@@ -386,7 +415,7 @@ Todas estas tablas están **versionadas en `supabase/migrations/`** desde el san
 
 ### 8.4 Realtime
 
-Publicación `supabase_realtime` incluye `team_messages` y `private_messages`. `useClubData` también se suscribe a cambios de esquema para refrescar el store demo.
+Publicación `supabase_realtime` incluye `team_messages`, `private_messages` y, desde la Fase 2, `convocatoria_responses` y `convocatoria_extra_players` (para el refresco en vivo del panel de convocatorias del entrenador). `useClubData` también se suscribe a cambios de esquema para refrescar el store demo.
 
 ### 8.5 Saneamiento de migraciones (Fase 0)
 
@@ -398,6 +427,15 @@ El repo tuvo temporalmente una carpeta `supabase/manual/` con SQL **aditivo e id
 - `20260721090300_convocatorias_and_registration_role.sql` — `convocatorias`, `convocatoria_responses` (+ RLS) y la RPC `set_self_registration_role`.
 
 Los valores de enum `senior`/`staff` y el `CHECK` ampliado de `user_roles` ya se habían versionado antes (`20260720100000`, `20260720100001`). Todas las migraciones son idempotentes (`CREATE … IF NOT EXISTS`, `DROP POLICY IF EXISTS` + `CREATE`), por lo que pueden reejecutarse sin romper la BD viva. Asumen la existencia previa del enum `app_role` y del helper `has_role()`, creados fuera de migraciones como el resto del esquema base.
+
+### 8.6 Migraciones de las Fases 2-5
+
+Añadidas de forma aditiva e idempotente, coherentes con las políticas RLS existentes:
+
+- `20260722100000_attendance.sql` — tabla `attendance` (asistencia por jugador/equipo/día) + RLS (admin/coach gestionan; jugador/familia leen lo suyo) + trigger de `updated_at`.
+- `20260722100100_federativa_pdf.sql` — columnas `registrations.federativa_pdf_url`/`federativa_status` + política `registrations_update_own` (para que la familia adjunte su ficha).
+- `20260722100200_convocatorias_fase2.sql` — columna `convocatorias.min_players`, tabla `convocatoria_extra_players` (+ RLS) y alta de ambas tablas de convocatoria en la publicación `supabase_realtime`.
+- `20260722100300_dorsales_tallas.sql` — `player_teams.dorsal` (+ índice único parcial por equipo), RPC `set_player_dorsal`, `teams.travels` y tabla `equipment_sizes` (+ RLS + trigger).
 
 ---
 
@@ -502,4 +540,4 @@ supabase/migrations/           # Esquema, RLS, triggers, funciones, seeds
 
 ---
 
-*Documento generado a partir del análisis del código fuente. Última revisión: 2026-07-21 (rama `claude/session-ayxoss`). El plan de trabajo pendiente vive en [`ROADMAP.md`](./ROADMAP.md).*
+*Documento generado a partir del análisis del código fuente. Última revisión: 2026-07-21 (rama `claude/plan-roadmap-phases-2-5-53sozm`). El plan de trabajo pendiente vive en [`ROADMAP.md`](./ROADMAP.md).*

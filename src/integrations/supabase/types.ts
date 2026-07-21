@@ -8,6 +8,57 @@ export type Database = {
   };
   public: {
     Tables: {
+      attendance: {
+        Row: {
+          absent_reason: string | null;
+          created_at: string;
+          date: string;
+          id: string;
+          player_id: string;
+          recorded_by: string | null;
+          status: string;
+          team_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          absent_reason?: string | null;
+          created_at?: string;
+          date: string;
+          id?: string;
+          player_id: string;
+          recorded_by?: string | null;
+          status: string;
+          team_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          absent_reason?: string | null;
+          created_at?: string;
+          date?: string;
+          id?: string;
+          player_id?: string;
+          recorded_by?: string | null;
+          status?: string;
+          team_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attendance_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_team_id_fkey";
+            columns: ["team_id"];
+            isOneToOne: false;
+            referencedRelation: "teams";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       chat_channels: {
         Row: {
           channel_key: string;
@@ -185,18 +236,21 @@ export type Database = {
       player_teams: {
         Row: {
           created_at: string;
+          dorsal: number | null;
           id: string;
           player_id: string;
           team_id: string;
         };
         Insert: {
           created_at?: string;
+          dorsal?: number | null;
           id?: string;
           player_id: string;
           team_id: string;
         };
         Update: {
           created_at?: string;
+          dorsal?: number | null;
           id?: string;
           player_id?: string;
           team_id?: string;
@@ -225,6 +279,7 @@ export type Database = {
           date: string;
           id: string;
           location: string | null;
+          min_players: number | null;
           notes: string | null;
           team_id: string | null;
           time: string | null;
@@ -236,6 +291,7 @@ export type Database = {
           date: string;
           id?: string;
           location?: string | null;
+          min_players?: number | null;
           notes?: string | null;
           team_id?: string | null;
           time?: string | null;
@@ -247,6 +303,7 @@ export type Database = {
           date?: string;
           id?: string;
           location?: string | null;
+          min_players?: number | null;
           notes?: string | null;
           team_id?: string | null;
           time?: string | null;
@@ -302,6 +359,83 @@ export type Database = {
             foreignKeyName: "convocatoria_responses_player_id_fkey";
             columns: ["player_id"];
             isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      convocatoria_extra_players: {
+        Row: {
+          convocatoria_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          player_id: string;
+        };
+        Insert: {
+          convocatoria_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          player_id: string;
+        };
+        Update: {
+          convocatoria_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          player_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "convocatoria_extra_players_convocatoria_id_fkey";
+            columns: ["convocatoria_id"];
+            isOneToOne: false;
+            referencedRelation: "convocatorias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "convocatoria_extra_players_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      equipment_sizes: {
+        Row: {
+          backpack_size: string | null;
+          hoodie_size: string | null;
+          player_id: string;
+          polo_size: string | null;
+          reversible_size: string | null;
+          tracksuit_size: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          backpack_size?: string | null;
+          hoodie_size?: string | null;
+          player_id: string;
+          polo_size?: string | null;
+          reversible_size?: string | null;
+          tracksuit_size?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          backpack_size?: string | null;
+          hoodie_size?: string | null;
+          player_id?: string;
+          polo_size?: string | null;
+          reversible_size?: string | null;
+          tracksuit_size?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "equipment_sizes_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: true;
             referencedRelation: "players";
             referencedColumns: ["id"];
           },
@@ -363,6 +497,8 @@ export type Database = {
           doc_type: string | null;
           email: string | null;
           family_id: string | null;
+          federativa_pdf_url: string | null;
+          federativa_status: string | null;
           full_name: string | null;
           id: string;
           parent_registration_id: string | null;
@@ -391,6 +527,8 @@ export type Database = {
           doc_type?: string | null;
           email?: string | null;
           family_id?: string | null;
+          federativa_pdf_url?: string | null;
+          federativa_status?: string | null;
           full_name?: string | null;
           id?: string;
           parent_registration_id?: string | null;
@@ -419,6 +557,8 @@ export type Database = {
           doc_type?: string | null;
           email?: string | null;
           family_id?: string | null;
+          federativa_pdf_url?: string | null;
+          federativa_status?: string | null;
           full_name?: string | null;
           id?: string;
           parent_registration_id?: string | null;
@@ -584,6 +724,7 @@ export type Database = {
           created_at: string;
           id: string;
           name: string;
+          travels: boolean;
           updated_at: string;
         };
         Insert: {
@@ -592,6 +733,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           name: string;
+          travels?: boolean;
           updated_at?: string;
         };
         Update: {
@@ -600,6 +742,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           name?: string;
+          travels?: boolean;
           updated_at?: string;
         };
         Relationships: [];
@@ -648,6 +791,10 @@ export type Database = {
       };
       set_self_registration_role: {
         Args: { _role: string };
+        Returns: undefined;
+      };
+      set_player_dorsal: {
+        Args: { _player_id: string; _team_id: string; _dorsal: number };
         Returns: undefined;
       };
     };

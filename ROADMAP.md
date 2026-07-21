@@ -5,15 +5,17 @@
 > el estado real del código (`PRODUCT_SPEC.md` + revisión de `src/` y
 > `supabase/migrations/`).
 >
-> Fecha de revisión: **2026-07-21** · Rama de trabajo: `claude/session-2f11tg`
+> Fecha de revisión: **2026-07-21** · Rama de trabajo: `claude/plan-roadmap-phases-2-5-53sozm`
 
 ---
 
 ## 1. Resumen ejecutivo
 
-De los **10 bloques** descritos en el plan de inicio, **6 están implementados y
-funcionales** contra Supabase, **2 lo están parcialmente** (dependen de
-`localStorage` / datos demo) y **2 módulos completos no existen todavía**.
+De los **10 bloques** descritos en el plan de inicio, **8 están implementados y
+funcionales** contra Supabase (incluidos, tras las Fases 2-5, la Ficha Federativa
+PDF, la asistencia persistida y las convocatorias completas), **2 lo están
+parcialmente** (el Módulo 6 —calendario/GesDeportiva— no existe aún, y el Módulo 9
+tiene dorsales+tallas pero falta la tienda/consola de pedidos).
 Las **2 fases "en reserva"** (Galería y Estadísticas) siguen como *"Próximamente"*.
 
 | # | Módulo del plan | Estado | Falta principal |
@@ -21,13 +23,13 @@ Las **2 fases "en reserva"** (Galería y Estadísticas) siguen como *"Próximame
 | 1 | Infraestructura y Stack | ✅ Completo | — |
 | 2 | Matriz de Roles (admin/coach/family) | ✅ Completo | — |
 | 3 | Flujo "Netflix" + FamilySelector + PIN + Código de referencia | ✅ Completo | — |
-| 4 | Admisión y Registro Federativo | 🟡 Parcial | **Ficha Federativa PDF** (descargar→firmar→resubir→validar) |
-| 5 | Asistencia y Retrasos | 🟡 Parcial | Persistencia en **Supabase** (hoy en `localStorage`) |
+| 4 | Admisión y Registro Federativo | ✅ Completo | — (Ficha Federativa PDF implementada; falta solo publicar el PDF oficial en blanco) |
+| 5 | Asistencia y Retrasos | ✅ Completo | — (persistida en Supabase, tabla `attendance`) |
 | 6 | **Calendario e Importación Exprés (GesDeportiva)** | ❌ **No existe** | Tabla `matches`, importación Excel con UPSERT por `match_number`, Casa/Fuera real |
 | 7 | Comunicaciones y Canales | ✅ Completo | — (pulir cartelera/tablón) |
 | 8 | Financiero (3 cuotas) | ✅ Completo | — |
-| 9 | **Equipaciones y Logística de Ropa** | ❌ **No existe** | Dorsales blindados, packs de viaje, tienda + pedido a fábrica |
-| 10 | Convocatorias Múltiples y Bidireccionales | 🟡 Parcial | "Doblar" categorías, contador mínimo, vínculo a partido, quitar placeholders |
+| 9 | **Equipaciones y Logística de Ropa** | 🟡 Parcial | Dorsales blindados ✅ y packs de viaje/tallas ✅; **falta** tienda + consola de pedidos a fábrica |
+| 10 | Convocatorias Múltiples y Bidireccionales | 🟡 Parcial | "Doblar" ✅, contador mínimo ✅, rechazos en vivo ✅; **falta** el vínculo a partido (depende del Módulo 6) |
 | — | Galería Multimedia (reserva) | ⏳ Próximamente | Implementación completa |
 | — | Estadísticas Técnicas (reserva) | ⏳ Próximamente | Implementación completa |
 
@@ -54,38 +56,30 @@ Falta:
 - **Visualización "sagrada"**: orden federativo `Local – Visitante`, indicador **[🏠 CASA]** (color corporativo) / **[🚗 FUERA]** (fondo neutro).
 - **Nombre del pabellón como botón** que abre la ruta en Google Maps (la UI existe en demo; falta enlazarla a datos reales).
 
-### 👕 Módulo 9 — Equipaciones y Logística de Ropa — *no existe*
+### 👕 Módulo 9 — Equipaciones y Logística de Ropa — *parcial (dorsales + tallas ✅)*
 
-No hay ningún componente, tabla ni lógica. Falta por completo:
-- **Dorsales blindados**: el dorsal lo fija el entrenador en su panel; **constraint de unicidad** en BD que impida dos dorsales iguales dentro del mismo `team_id`. Las familias no eligen número.
-- **Packs de viaje automáticos**: el formulario de tallas cambia según el nivel del equipo — liga local = solo equipación reversible; equipo que viaja = chándal, polo de paseo, sudadera y mochila reglamentaria.
-- **Tienda y pedido a fábrica**: catálogo voluntario de reposición/merchandising para familias + **consola de pedidos** del admin que agrupa por talla y categoría (ej. "12 sudaderas talla M") con **exportación a Excel** para enviar a fábrica.
+- ✅ **Dorsales blindados**: `player_teams.dorsal` con **índice único por `team_id`**, fijado por el entrenador en `DorsalManager.tsx` vía RPC `set_player_dorsal`. Las familias no eligen número.
+- ✅ **Packs de viaje automáticos**: `teams.travels` marca el nivel del equipo; `EquipmentSizes.tsx` muestra solo la equipación reversible (liga local) o el pack completo (chándal, polo, sudadera, mochila) para equipos que viajan. Tallas en `equipment_sizes`.
+- ⏳ **Tienda y pedido a fábrica**: catálogo de reposición/merchandising + **consola de pedidos** del admin con **exportación a Excel** — *pendiente* (fuera del alcance actual).
 
-### 📝 Módulo 4 — Ficha Federativa PDF — *falta la pieza clave*
+### 📝 Módulo 4 — Ficha Federativa PDF — ✅ *implementado*
 
-El registro (`RegistrationFlow`) ya sube foto carnet y DNIs (JPG) y captura
-firma digital, y `ValidationConsole` valida con semáforo. **Falta** el flujo de
-la *Ficha Federativa Única*:
-- Descargar el **documento oficial** desde la app.
-- Volver a subirlo **firmado en PDF** tras el reconocimiento médico.
-- Que el admin lo valide con el **semáforo** (Verde/Amarillo/Rojo) como un documento más.
+- ✅ Resubir la ficha **firmada en PDF** tras el reconocimiento médico (`FederativaDoc.tsx` → Storage `player-docs` + `registrations.federativa_pdf_url`/`federativa_status`).
+- ✅ El admin la valida con el **semáforo** como 5º documento en `ValidationConsole`.
+- ⏳ Descargar el **documento oficial**: botón *placeholder configurable* (`FEDERATIVA_TEMPLATE_URL`) listo para el PDF oficial cuando el club lo publique.
 
-*(La estructura demo ya prevé un campo `federativaPdf`; falta implementarlo contra Supabase Storage + estado en `registrations`.)*
+### 📋 Módulo 10 — Convocatorias — *casi completo (falta vínculo a partido)*
 
-### 📋 Módulo 10 — Convocatorias — *funciona pero incompleto*
+- ✅ **"Doblar" jugadores de otras categorías** (`convocatoria_extra_players`).
+- ✅ **Contador en tiempo real** en **rojo** si no se llega al mínimo (`convocatorias.min_players`), con roster por jugador y refresco en vivo (Realtime).
+- ⏳ **Tarjetas por partido de la semana** (vínculo `convocatoria → match`) — pendiente del Módulo 6.
+- ✅ Placeholders `current_user_id`/`current_player_id` retirados (integrados con `useAuth`, ya en Fase 0). Corregido el filtrado de `ConvocatoriesPlayer` (mostraba todas).
 
-`ConvocatoriesManager`/`ConvocatoriesPlayer` crean convocatorias y recogen
-respuestas confirmar/rechazar. Falta lo que el plan detalla:
-- **"Pescar" jugadores de categorías inferiores** autorizados a doblar según reglamento.
-- **Contador en tiempo real** que avisa en **rojo** si no se llega al mínimo federativo exigido en acta.
-- **Tarjetas independientes por cada partido de la semana** (vínculo `convocatoria → match`, dependiente del Módulo 6).
-- **Quitar los placeholders** `created_by = "current_user_id"` y `player_id = "current_player_id"` e integrarlos con `useAuth`.
+### ⏱️ Módulo 5 — Asistencia — ✅ *persistida en Supabase*
 
-### ⏱️ Módulo 5 — Asistencia — *persistencia pendiente*
-
-`Attendance.tsx` funciona (Presente/Retraso/Ausente + motivo + histórico mensual)
-pero persiste en `localStorage` (`attendance_v2`). Falta **tabla `attendance`
-en Supabase** con RLS (coach de sus equipos / admin) y migrar la lectura/escritura.
+`Attendance.tsx` (Presente/Retraso/Ausente + motivo + histórico mensual) ahora
+persiste en la **tabla `attendance`** de Supabase (upsert por `player_id+team_id+date`)
+con RLS (admin/coach gestionan; jugador/familia leen lo suyo). Retirado `localStorage`.
 
 ### 🖼️ / 📊 Fases en reserva
 
@@ -125,22 +119,24 @@ Es el núcleo deportivo del que dependen Convocatorias, Jornada y Cartelera.
 3. Conectar `PlayerView` (Jornada + Calendario) a la tabla real; indicador CASA/FUERA con color corporativo y botón a Google Maps del pabellón.
 4. Retirar `matches` del *demo store*.
 
-### Fase 2 — Convocatorias completas (Módulo 10) · *alta* — ~3-4 días · depende de Fase 1
-1. Vincular convocatoria de partido a un `match`; **una tarjeta por partido de la semana**.
-2. **"Doblar"**: selección de jugadores de categorías inferiores autorizados.
-3. **Contador de mínimo federativo** en rojo cuando no se alcanza.
-4. Reflejar en vivo los rechazos en el panel del entrenador.
+### Fase 2 — Convocatorias completas (Módulo 10) · *alta* — ✅ **Completada** (salvo vínculo a partido)
+1. ⏳ Vincular convocatoria de partido a un `match` — **pendiente**, depende de la Fase 1.
+2. ✅ **"Doblar"**: jugadores de otras categorías (`convocatoria_extra_players`).
+3. ✅ **Contador de mínimo federativo** (`convocatorias.min_players`) en rojo cuando no se alcanza.
+4. ✅ Rechazos/confirmaciones en vivo (Supabase Realtime) en el panel del entrenador, con roster por jugador. Corregido además el filtrado de `ConvocatoriesPlayer` (antes mostraba todas).
 
-### Fase 3 — Asistencia en Supabase (Módulo 5) · *media* — ~1-2 días
-1. Tabla `attendance` + RLS. 2. Migrar `Attendance.tsx` de `localStorage` a Supabase manteniendo el histórico mensual.
+### Fase 3 — Asistencia en Supabase (Módulo 5) · *media* — ✅ **Completada**
+1. ✅ Tabla `attendance` + RLS. 2. ✅ `Attendance.tsx` migrado de `localStorage` a Supabase (upsert por `player_id+team_id+date`) manteniendo el histórico mensual.
 
-### Fase 4 — Ficha Federativa PDF (Módulo 4) · *media* — ~2-3 días
-1. Descarga del documento oficial. 2. Resubida del PDF firmado a Storage + estado en `registrations`. 3. Integrarlo en el semáforo de `ValidationConsole`.
+### Fase 4 — Ficha Federativa PDF (Módulo 4) · *media* — ✅ **Completada** (falta publicar el PDF oficial)
+1. ⏳ Descarga del documento oficial — botón *placeholder configurable* (`FEDERATIVA_TEMPLATE_URL`) listo para enganchar el PDF cuando el club lo publique.
+2. ✅ Resubida del PDF firmado a Storage + `federativa_pdf_url`/`federativa_status` en `registrations` (`FederativaDoc.tsx`).
+3. ✅ Integrado como 5º documento en el semáforo de `ValidationConsole`.
 
-### Fase 5 — Equipaciones y Logística (Módulo 9) · *media/alta esfuerzo* — ~6-8 días
-1. Dorsales: campo + **constraint único por `team_id`** + panel del entrenador.
-2. Formulario de tallas condicional al nivel del equipo (packs de viaje).
-3. Tienda/merchandising + consola de pedidos del admin con **agrupación por talla/categoría y export a Excel**.
+### Fase 5 — Equipaciones y Logística (Módulo 9) · *media/alta esfuerzo* — 🟡 **Parcial** (dorsales + tallas)
+1. ✅ Dorsales: `player_teams.dorsal` + **índice único por `team_id`** + RPC `set_player_dorsal` + panel del entrenador (`DorsalManager.tsx`).
+2. ✅ Formulario de tallas condicional al nivel del equipo (`teams.travels` + `equipment_sizes` + `EquipmentSizes.tsx`).
+3. ⏳ Tienda/merchandising + consola de pedidos del admin con export a Excel — **pendiente** (fuera del alcance actual).
 
 ### Fase 6 — Cartelera/Tablón definitivo · *media* — ~2-3 días
 1. Consolidar `NewsBoard`/`Board` en una cartelera real contra Supabase y enlazarla en navegación.

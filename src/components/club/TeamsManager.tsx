@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Edit2, Trash2, Users, Trophy, RefreshCw, ArrowLeftRight, MessagesSquare } from "lucide-react";
+import { Plus, Edit2, Trash2, Users, Trophy, RefreshCw, ArrowLeftRight, MessagesSquare, Plane } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PlayerTeamAssignment } from "@/components/club/PlayerTeamAssignment";
@@ -19,6 +19,7 @@ interface Team {
   id: string;
   name: string;
   category: string;
+  travels: boolean;
 }
 
 interface Player {
@@ -35,12 +36,12 @@ export function TeamsManager() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", category: "" });
+  const [formData, setFormData] = useState({ name: "", category: "", travels: false });
 
   const load = useCallback(async () => {
     setLoading(true);
     const [{ data: teamsData }, { data: playersData }] = await Promise.all([
-      supabase.from("teams").select("id, name, category").order("name"),
+      supabase.from("teams").select("id, name, category, travels").order("name"),
       supabase.from("players").select("id, full_name, team_id"),
     ]);
     setTeams((teamsData ?? []) as Team[]);
@@ -64,6 +65,7 @@ export function TeamsManager() {
         .update({
           name: formData.name.trim(),
           category: formData.category.trim(),
+          travels: formData.travels,
         })
         .eq("id", editingId);
       if (error) {
@@ -75,6 +77,7 @@ export function TeamsManager() {
       const { error } = await supabase.from("teams").insert({
         name: formData.name.trim(),
         category: formData.category.trim(),
+        travels: formData.travels,
       });
       if (error) {
         toast.error("Error al crear equipo");
@@ -83,14 +86,14 @@ export function TeamsManager() {
       toast.success("Equipo creado");
     }
 
-    setFormData({ name: "", category: "" });
+    setFormData({ name: "", category: "", travels: false });
     setEditingId(null);
     setOpen(false);
     load();
   };
 
   const handleEdit = (team: Team) => {
-    setFormData({ name: team.name, category: team.category });
+    setFormData({ name: team.name, category: team.category, travels: team.travels });
     setEditingId(team.id);
     setOpen(true);
   };
@@ -108,7 +111,7 @@ export function TeamsManager() {
 
   const handleClose = () => {
     setOpen(false);
-    setFormData({ name: "", category: "" });
+    setFormData({ name: "", category: "", travels: false });
     setEditingId(null);
   };
 
@@ -162,7 +165,7 @@ export function TeamsManager() {
               <Button
                 onClick={() => {
                   setEditingId(null);
-                  setFormData({ name: "", category: "" });
+                  setFormData({ name: "", category: "", travels: false });
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -190,6 +193,20 @@ export function TeamsManager() {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   />
                 </div>
+                <label className="flex items-start gap-2 rounded-lg border border-border bg-surface p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={formData.travels}
+                    onChange={(e) => setFormData({ ...formData, travels: e.target.checked })}
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Equipo que viaja</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Añade el pack completo de ropa (chándal, polo, sudadera y mochila) al formulario de tallas de sus jugadores.
+                    </span>
+                  </span>
+                </label>
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" onClick={handleClose}>
                     Cancelar
@@ -222,6 +239,11 @@ export function TeamsManager() {
                       <div>
                         <h3 className="font-bold text-foreground">{team.name}</h3>
                         <p className="text-sm text-muted-foreground">{team.category}</p>
+                        {team.travels && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                            <Plane className="h-3 w-3" /> Viaja
+                          </span>
+                        )}
                       </div>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(team)}>
