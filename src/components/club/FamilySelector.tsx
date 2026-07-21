@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAuth, ADULT_PIN, type FamilyChild } from "@/lib/auth-context";
-import { useClub } from "@/lib/clubStore";
+import { useMatches } from "@/hooks/use-matches";
+import { type MatchRow } from "@/lib/matches";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
@@ -241,18 +242,38 @@ function FamilyTeams({ children }: { children: FamilyChild[] }) {
 }
 
 function FamilyAgenda({ children }: { children: FamilyChild[] }) {
-  const matches = useClub((s) => s.matches);
+  const { matches } = useMatches();
+  const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    const keys = children.map((c) => c.team_id).filter(Boolean);
+    if (keys.length === 0) return;
+    // team_id del hijo puede ser UUID o nombre; se empareja en cliente.
+    supabase.from("teams").select("id, name").then(({ data }) => { if (data) setTeams(data); });
+  }, [children]);
 
   const items = useMemo(() => {
     if (children.length === 0) return [];
-    const upcoming = [...matches]
-      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-      .slice(0, Math.max(children.length * 2, 3));
-    return upcoming.map((m, i) => {
-      const child = children[i % children.length];
-      return { match: m, child };
+    // UUID de equipo (principal) de cada hijo.
+    const childTeamUuid = new Map<string, string | null>();
+    children.forEach((c) => {
+      const t = teams.find((x) => x.id === c.team_id || x.name === c.team_id);
+      childTeamUuid.set(c.id, t?.id ?? null);
     });
-  }, [matches, children]);
+    const rows: { match: MatchRow; child: FamilyChild }[] = [];
+    children.forEach((c) => {
+      const uuid = childTeamUuid.get(c.id);
+      if (!uuid) return;
+      matches.filter((m) => m.team_id === uuid).forEach((m) => rows.push({ match: m, child: c }));
+    });
+    return rows
+      .sort((a, b) =>
+        (a.match.match_date + (a.match.match_time ?? "")).localeCompare(
+          b.match.match_date + (b.match.match_time ?? ""),
+        ),
+      )
+      .slice(0, Math.max(children.length * 2, 3));
+  }, [matches, children, teams]);
 
   if (children.length === 0) return null;
 
@@ -275,13 +296,13 @@ function FamilyAgenda({ children }: { children: FamilyChild[] }) {
               <div className="min-w-0 flex-1">
                 <div className="text-sm">
                   <span className="font-semibold">
-                    {new Date(match.date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "short" })} · {match.time}
+                    {new Date(match.match_date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "short" })}{match.match_time ? ` · ${match.match_time}` : ""}
                   </span>
                   <span className="text-muted-foreground"> — juega </span>
                   <span className="font-bold">{child.full_name.split(" ")[0]}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  vs {match.opponent} · {match.venue === "home" ? "en casa" : "fuera"}
+                  vs {match.opponent} · {match.is_home ? "en casa" : "fuera"}
                 </div>
               </div>
             </li>

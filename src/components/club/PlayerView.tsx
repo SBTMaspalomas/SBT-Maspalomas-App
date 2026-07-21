@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useClub } from "@/lib/clubStore";
+import { useMatches } from "@/hooks/use-matches";
+import { localVisitante, mapsUrl } from "@/lib/matches";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Calendar, Trophy, Sparkles, Newspaper, Image as ImageIcon, BarChart3, MapPin, Clock } from "lucide-react";
@@ -15,12 +17,14 @@ interface Props {
 
 export function PlayerView({ childId }: Props = {}) {
   const auth = useAuth();
-  const matches = useClub((s) => s.matches);
   const announcements = useClub((s) => s.announcements);
   const [loading, setLoading] = useState(true);
   const [standings, setStandings] = useState<StandingRow[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [teamLabel, setTeamLabel] = useState<string>("Sin equipo asignado");
+  // UUID de los equipos del jugador (resuelto en resolveTeams) para filtrar partidos.
+  const [teamUuids, setTeamUuids] = useState<string[]>([]);
+  const { matches } = useMatches(teamUuids);
 
   const child = useMemo(() => {
     if (!childId || !auth.family) return null;
@@ -73,32 +77,27 @@ export function PlayerView({ childId }: Props = {}) {
       // Compatibilidad: players.team_id puede guardar un UUID o el nombre del equipo.
       const primary = child?.team_id ?? null;
       const names: string[] = [];
+      const matchedIds: string[] = [];
       teamList.forEach((t) => {
         if (ids.has(t.id) || t.id === primary || t.name === primary) {
           names.push(`${t.name} (${t.category})`);
+          matchedIds.push(t.id);
         }
       });
       const label = names.length > 0
         ? Array.from(new Set(names)).join(" · ")
         : (primary ? primary : "Sin equipo asignado");
-      if (active) setTeamLabel(label);
+      if (active) {
+        setTeamLabel(label);
+        setTeamUuids(matchedIds);
+      }
     };
     resolveTeams();
     return () => { active = false; };
   }, [child]);
 
-  // Filter demo matches: match on team_id text loosely against team name in demo store
-  const teamMatches = useMemo(() => {
-    if (!child?.team_id) return matches;
-    const target = child.team_id.toLowerCase();
-    return matches.filter((m) => {
-      if (target.includes("mini a")) return m.teamId === "t1";
-      if (target.includes("cadete")) return m.teamId === "t2";
-      return true;
-    });
-  }, [matches, child]);
-
-  const sorted = [...teamMatches].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  // `matches` ya viene filtrado por los equipos del jugador y ordenado por fecha/hora.
+  const sorted = matches;
   const next = sorted[0];
 
   const displayName = child?.full_name ?? auth.fullName ?? "Jugador/a";
@@ -130,46 +129,65 @@ export function PlayerView({ childId }: Props = {}) {
             <TabsContent value="jornada" className="mt-4">
               {!next ? (
                 <p className="text-sm text-muted-foreground">No hay próxima jornada programada.</p>
-              ) : (
-                <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
-                  <div className="text-xs uppercase tracking-wide text-primary">Próxima jornada</div>
-                  <div className="mt-1 text-lg font-black">{teamLabel} <span className="text-muted-foreground text-sm">vs</span> {next.opponent}</div>
-                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" /> {new Date(next.date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "short" })} · {next.time}
+              ) : (() => {
+                const { local, visitante } = localVisitante(next, teamLabel);
+                return (
+                  <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
+                    <div className="text-xs uppercase tracking-wide text-primary">Próxima jornada</div>
+                    <div className="mt-1 text-lg font-black">{local} <span className="text-muted-foreground text-sm">vs</span> {visitante}</div>
+                    <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" /> {new Date(next.match_date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "short" })}{next.match_time ? ` · ${next.match_time}` : ""}
+                    </div>
+                    <div className="mt-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${next.is_home ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>
+                        {next.is_home ? "EN CASA" : "FUERA"}
+                      </span>
+                    </div>
+                    {next.venue_address && (
+                      <a className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        href={mapsUrl(next.venue_address)}
+                        target="_blank" rel="noreferrer">
+                        <MapPin className="h-3 w-3" /> {next.venue ?? next.venue_address} · abrir en Maps
+                      </a>
+                    )}
                   </div>
-                  <div className="mt-2">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${next.venue === "home" ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>
-                      {next.venue === "home" ? "EN CASA" : "FUERA"}
-                    </span>
-                  </div>
-                  {next.venue === "away" && next.address && (
-                    <a className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(next.address)}`}
-                      target="_blank" rel="noreferrer">
-                      <MapPin className="h-3 w-3" /> {next.address} · abrir en Maps
-                    </a>
-                  )}
-                </div>
-              )}
+                );
+              })()}
             </TabsContent>
 
             <TabsContent value="calendario" className="mt-4 space-y-2">
               {sorted.length === 0 && <p className="text-sm text-muted-foreground">Sin partidos en el calendario.</p>}
-              {sorted.map((m) => (
-                <div key={m.id} className="rounded-lg border border-border bg-surface p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold">{teamLabel} vs {m.opponent}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {new Date(m.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · {m.time}
+              {sorted.map((m) => {
+                const { local, visitante } = localVisitante(m, teamLabel);
+                return (
+                  <div key={m.id} className="rounded-lg border border-border bg-surface p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">{local} vs {visitante}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {new Date(m.match_date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}{m.match_time ? ` · ${m.match_time}` : ""}
+                        </div>
+                        {m.venue_address ? (
+                          <a
+                            className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            href={mapsUrl(m.venue_address)}
+                            target="_blank" rel="noreferrer"
+                          >
+                            <MapPin className="h-3 w-3" /> {m.venue ?? "Ver ubicación"}
+                          </a>
+                        ) : m.venue ? (
+                          <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3" /> {m.venue}
+                          </div>
+                        ) : null}
                       </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.is_home ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>
+                        {m.is_home ? "CASA" : "FUERA"}
+                      </span>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.venue === "home" ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>
-                      {m.venue === "home" ? "CASA" : "FUERA"}
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </TabsContent>
 
             <TabsContent value="clasif" className="mt-4">
