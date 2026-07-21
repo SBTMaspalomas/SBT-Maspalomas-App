@@ -143,8 +143,8 @@ export function RoleManager() {
           familyId: fam?.id ?? null,
           referenceCode: fam?.reference_code ?? null,
           childCount: fam ? (childCountByFam.get(fam.id) ?? 0) : 0,
-          phone: (p as any).phone ?? null,
-          created_at: (p as any).created_at ?? null,
+          phone: p.phone ?? null,
+          created_at: p.created_at ?? null,
         };
       }),
     );

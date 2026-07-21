@@ -162,7 +162,7 @@ function ChildTile({ child, onClick }: { child: FamilyChild; onClick: () => void
   useEffect(() => {
     supabase.from("players").select("avatar_url").eq("id", child.id).maybeSingle()
       .then(({ data }) => {
-        if (data && (data as any).avatar_url) setAvatarUrl((data as any).avatar_url);
+        if (data && data.avatar_url) setAvatarUrl(data.avatar_url);
       });
   }, [child.id]);
 

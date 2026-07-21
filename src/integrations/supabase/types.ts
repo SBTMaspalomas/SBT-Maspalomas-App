@@ -354,7 +354,9 @@ export type Database = {
           auth_travel: boolean | null;
           birth_date: string | null;
           created_at: string;
+          dni_back_status: string | null;
           dni_back_url: string | null;
+          dni_front_status: string | null;
           dni_front_url: string | null;
           doc_number: string | null;
           doc_status: string | null;
@@ -365,8 +367,10 @@ export type Database = {
           id: string;
           parent_registration_id: string | null;
           phone: string | null;
+          photo_status: string | null;
           photo_url: string | null;
           reject_reason: string | null;
+          signature_status: string | null;
           signature_url: string | null;
           type: string;
           user_id: string | null;
@@ -378,7 +382,9 @@ export type Database = {
           auth_travel?: boolean | null;
           birth_date?: string | null;
           created_at?: string;
+          dni_back_status?: string | null;
           dni_back_url?: string | null;
+          dni_front_status?: string | null;
           dni_front_url?: string | null;
           doc_number?: string | null;
           doc_status?: string | null;
@@ -389,8 +395,10 @@ export type Database = {
           id?: string;
           parent_registration_id?: string | null;
           phone?: string | null;
+          photo_status?: string | null;
           photo_url?: string | null;
           reject_reason?: string | null;
+          signature_status?: string | null;
           signature_url?: string | null;
           type: string;
           user_id?: string | null;
@@ -402,7 +410,9 @@ export type Database = {
           auth_travel?: boolean | null;
           birth_date?: string | null;
           created_at?: string;
+          dni_back_status?: string | null;
           dni_back_url?: string | null;
+          dni_front_status?: string | null;
           dni_front_url?: string | null;
           doc_number?: string | null;
           doc_status?: string | null;
@@ -413,8 +423,10 @@ export type Database = {
           id?: string;
           parent_registration_id?: string | null;
           phone?: string | null;
+          photo_status?: string | null;
           photo_url?: string | null;
           reject_reason?: string | null;
+          signature_status?: string | null;
           signature_url?: string | null;
           type?: string;
           user_id?: string | null;
