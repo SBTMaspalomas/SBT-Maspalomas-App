@@ -278,7 +278,7 @@ function ManualAdd({ teams, onDone }: { teams: TeamRow[]; onDone: () => void }) 
 // Importación CSV
 // ---------------------------------------------------------------------------
 
-function CsvStructureHelp() {
+function CsvStructureHelp({ teams }: { teams: TeamRow[] }) {
   const downloadTemplate = () => {
     const blob = new Blob([CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -313,7 +313,11 @@ function CsvStructureHelp() {
               ["fecha_nacimiento", "No", "AAAA-MM-DD o DD/MM/AAAA. Ej: 2012-05-14"],
               ["tipo_documento", "No", `Uno de: ${CSV_DOC_TYPES.join(", ")}`],
               ["numero_documento", "No", "Ej: 12345678A (sirve para vincular la foto)"],
-              ["equipo", "No", "Nombre exacto de un equipo existente. Ej: Infantil A"],
+              [
+                "equipo",
+                "No",
+                "Nombre exacto de un equipo existente (vincula al jugador en player_teams). Ver valores posibles abajo.",
+              ],
             ].map(([col, req, desc]) => (
               <tr key={col} className="border-t border-border/50">
                 <td className="py-1 pr-3 font-mono text-foreground">{col}</td>
@@ -324,6 +328,33 @@ function CsvStructureHelp() {
           </tbody>
         </table>
       </div>
+
+      <div className="space-y-1.5">
+        <div className="text-xs font-medium text-foreground">
+          Valores posibles para la columna «equipo»
+        </div>
+        {teams.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No hay equipos creados todavía. Créalos en «Equipos» antes de asignarlos en el CSV.
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Escribe en la columna <span className="font-mono">equipo</span> exactamente uno de
+              estos nombres (se ignoran mayúsculas y acentos):
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {teams.map((t) => (
+                <Badge key={t.id} variant="outline" className="font-mono text-[11px]">
+                  {t.name}
+                  <span className="ml-1 text-muted-foreground">· {t.category}</span>
+                </Badge>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       <pre className="overflow-x-auto rounded-md border border-border bg-background p-2 text-[11px] leading-relaxed">
         {CSV_TEMPLATE}
       </pre>
@@ -450,7 +481,7 @@ function CsvImport({
 
   return (
     <div className="space-y-4">
-      <CsvStructureHelp />
+      <CsvStructureHelp teams={teams} />
 
       <label
         className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium transition hover:bg-muted ${
