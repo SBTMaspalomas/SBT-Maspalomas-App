@@ -8,6 +8,36 @@ export type Database = {
   };
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          author_id: string | null;
+          body: string | null;
+          created_at: string;
+          id: string;
+          pinned: boolean;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          author_id?: string | null;
+          body?: string | null;
+          created_at?: string;
+          id?: string;
+          pinned?: boolean;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          author_id?: string | null;
+          body?: string | null;
+          created_at?: string;
+          id?: string;
+          pinned?: boolean;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       attendance: {
         Row: {
           absent_reason: string | null;
@@ -195,8 +225,13 @@ export type Database = {
           birth_date: string | null;
           created_at: string;
           family_id: string | null;
+          federativa_pdf_url: string | null;
           full_name: string;
           id: string;
+          id_document_number: string | null;
+          id_document_type: string | null;
+          id_document_url: string | null;
+          photo_url: string | null;
           team_id: string | null;
           updated_at: string;
           user_id: string | null;
@@ -206,8 +241,13 @@ export type Database = {
           birth_date?: string | null;
           created_at?: string;
           family_id?: string | null;
+          federativa_pdf_url?: string | null;
           full_name: string;
           id?: string;
+          id_document_number?: string | null;
+          id_document_type?: string | null;
+          id_document_url?: string | null;
+          photo_url?: string | null;
           team_id?: string | null;
           updated_at?: string;
           user_id?: string | null;
@@ -217,8 +257,13 @@ export type Database = {
           birth_date?: string | null;
           created_at?: string;
           family_id?: string | null;
+          federativa_pdf_url?: string | null;
           full_name?: string;
           id?: string;
+          id_document_number?: string | null;
+          id_document_type?: string | null;
+          id_document_url?: string | null;
+          photo_url?: string | null;
           team_id?: string | null;
           updated_at?: string;
           user_id?: string | null;
