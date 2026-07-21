@@ -2,7 +2,7 @@
 
 > Documento técnico-funcional que describe **todo lo implementado** en la aplicación de gestión del club de baloncesto **SBT Maspalomas** ("El Baloncesto en el Sur · Gran Canaria").
 >
-> Última revisión del código: **2026-07-21** (rama `claude/plan-roadmap-phases-2-5-53sozm`). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade además las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo.
+> Última revisión del código: **2026-07-21** (rama `claude/player-docs-upload-43zd4s`). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade además las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo. Incorpora también la **documentación por jugador gestionada por el administrador**: ficha federativa cumplimentada, foto y documento de identidad subidos por el admin al bucket `player-docs`, y los campos de **tipo y número de documento** en `players` (pantalla «Fichas jugadores»).
 >
 > El plan de lo que **falta** por construir frente al plan de inicio del proyecto vive en un documento aparte, [`ROADMAP.md`](./ROADMAP.md).
 
@@ -340,11 +340,21 @@ Por cada canal ofrece: **activar/desactivar** (`enabled`), cambiar el **estado**
 ### 7.16 Ficha Federativa PDF — `FederativaDoc.tsx` (family/senior)
 
 Flujo de la **Ficha Federativa Única** que complementa al registro documental:
-- Botón **"Descargar plantilla oficial"** (constante `FEDERATIVA_TEMPLATE_URL`, *placeholder configurable*: mientras no se publique el PDF oficial del club, el botón queda deshabilitado con una nota).
-- Por cada `registrations` del usuario (adulto + menores), **subida del PDF firmado** tras el reconocimiento médico (`accept="application/pdf"`, a Storage `player-docs/${uid}/federativa_...pdf`). Al subir, se fija `federativa_pdf_url` y `federativa_status = 'pending'`.
+- **Descarga de la ficha por jugador**: en lugar de una plantilla en blanco genérica, la sección "Descarga tu ficha federativa" lista los jugadores visibles del usuario (hijos de la familia y/o su propia ficha senior, resueltos por RLS sobre `players`) y ofrece, por cada uno, el **PDF cumplimentado que el administrador ha subido** (`players.federativa_pdf_url`). Si el club aún no la ha subido, se muestra "Aún no disponible".
+- Por cada `registrations` del usuario (adulto + menores), **subida del PDF firmado** tras el reconocimiento médico (`accept="application/pdf"`, a Storage `player-docs/${uid}/federativa_...pdf`). Al subir, se fija `registrations.federativa_pdf_url` y `federativa_status = 'pending'`.
 - Badge de estado (**en revisión / aprobada / rechazada**) y enlace para ver el PDF subido.
 
-El admin la valida como un documento más en `ValidationConsole` (§7.2). La escritura del PDF por parte de la familia se apoya en la política `registrations_update_own` añadida en esta fase.
+El admin la valida como un documento más en `ValidationConsole` (§7.2). La escritura del PDF firmado por parte de la familia se apoya en la política `registrations_update_own`. La **preparación/subida** de la ficha por jugador la realiza el administrador en `PlayerDocuments` (§7.16-bis).
+
+### 7.16-bis Documentación por jugador — `PlayerDocuments.tsx` (solo admin)
+
+Pantalla **"Fichas jugadores"** (nav admin) donde el administrador gestiona, por cada jugador de `players`, su documentación oficial:
+- **Ficha federativa (PDF)** cumplimentada → `players.federativa_pdf_url` (es el PDF que la familia/senior descarga en `FederativaDoc`).
+- **Foto** (JPG/PNG/WebP) → `players.photo_url`.
+- **Documento de identidad** (imagen o PDF) → `players.id_document_url`.
+- **Tipo de documento** (`DNI` · `NIE` · `Pasaporte` · `DNI tutor`) → `players.id_document_type` y **número** → `players.id_document_number`.
+
+Cada archivo se sube al bucket `player-docs` en `players/${playerId}/${tipo}_${timestamp}.${ext}` (política `player_docs_admin_all`) y su URL pública se persiste en la columna correspondiente. La lista muestra buscador por nombre, el identificador de cuenta (código de familia o "Senior") e indicadores de qué documentos ya están aportados; el diálogo "Gestionar" concentra la edición de datos y las subidas, con validación de tipo/tamaño (máx. 5 MB).
 
 ### 7.17 Dorsales — `DorsalManager.tsx` (coach/admin)
 
@@ -378,7 +388,7 @@ Tablas con **Row Level Security (RLS)** activada:
 | `user_roles` | Roles por usuario (enum `app_role`) | Lectura propia; admin gestiona todos |
 | `coach_teams` | Equipos asignados a un entrenador | Admin gestiona; coach lee lo suyo |
 | `teams` | Equipos (nombre, categoría, `age_category`, `travels`) | Lectura para autenticados; admin gestiona |
-| `players` | Jugadores (nombre, fecha nac., `team_id`, `family_id`, `avatar_url`, `user_id`) | Familia lee/edita sus hijos; el propio jugador Senior gestiona su ficha (`user_id = auth.uid()`); coach lee todos; admin gestiona |
+| `players` | Jugadores (nombre, fecha nac., `team_id`, `family_id`, `avatar_url`, `user_id`, **`federativa_pdf_url`**, **`photo_url`**, **`id_document_url`**, **`id_document_type`**, **`id_document_number`**) | Familia lee/edita sus hijos; el propio jugador Senior gestiona su ficha (`user_id = auth.uid()`); coach lee todos; admin gestiona (incl. subida de ficha federativa, foto y documento) |
 | `player_teams` | Puente jugador↔equipo (**multi-equipo**) + `dorsal` (único por equipo) | Lectura autenticados; admin gestiona; dorsal vía RPC `set_player_dorsal` |
 | `families_meta` | Ficha de familia (head, email, `reference_code`, `adult_pin`) | Familia lee/gestiona la suya; admin todo |
 | `standings` | Clasificación por equipo | Lectura autenticados; admin gestiona |
@@ -411,7 +421,7 @@ Estas tablas están **versionadas en `supabase/migrations/`** desde el saneamien
 ### 8.3 Storage
 
 - Bucket público **`avatars`** (logo del club, avatares).
-- Bucket **`player-docs`** (documentación de registro, comprobantes de pago, avatares subidos).
+- Bucket **`player-docs`** (documentación de registro, comprobantes de pago, avatares subidos y **documentación por jugador subida por el admin** en `players/${playerId}/…`: ficha federativa, foto y documento de identidad). Además de las políticas por carpeta de usuario (`${auth.uid()}/…`), el administrador tiene acceso total al bucket vía `player_docs_admin_all`.
 
 ### 8.4 Realtime
 
@@ -436,6 +446,7 @@ Añadidas de forma aditiva e idempotente, coherentes con las políticas RLS exis
 - `20260722100100_federativa_pdf.sql` — columnas `registrations.federativa_pdf_url`/`federativa_status` + política `registrations_update_own` (para que la familia adjunte su ficha).
 - `20260722100200_convocatorias_fase2.sql` — columna `convocatorias.min_players`, tabla `convocatoria_extra_players` (+ RLS) y alta de ambas tablas de convocatoria en la publicación `supabase_realtime`.
 - `20260722100300_dorsales_tallas.sql` — `player_teams.dorsal` (+ índice único parcial por equipo), RPC `set_player_dorsal`, `teams.travels` y tabla `equipment_sizes` (+ RLS + trigger).
+- `20260722100400_players_documents.sql` — columnas `players.federativa_pdf_url`, `players.photo_url`, `players.id_document_url`, `players.id_document_type` (con `CHECK` a `DNI`/`NIE`/`Pasaporte`/`DNI tutor`) y `players.id_document_number`; política de Storage `player_docs_admin_all` (acceso total del admin al bucket `player-docs` para subir la documentación por jugador).
 
 ---
 

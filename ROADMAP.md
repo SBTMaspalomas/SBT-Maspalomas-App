@@ -23,7 +23,7 @@ Las **2 fases "en reserva"** (Galería y Estadísticas) siguen como *"Próximame
 | 1 | Infraestructura y Stack | ✅ Completo | — |
 | 2 | Matriz de Roles (admin/coach/family) | ✅ Completo | — |
 | 3 | Flujo "Netflix" + FamilySelector + PIN + Código de referencia | ✅ Completo | — |
-| 4 | Admisión y Registro Federativo | ✅ Completo | — (Ficha Federativa PDF implementada; falta solo publicar el PDF oficial en blanco) |
+| 4 | Admisión y Registro Federativo | ✅ Completo | — (Ficha Federativa PDF por jugador subida por el admin; foto, documento de identidad y tipo/número de documento en `players`) |
 | 5 | Asistencia y Retrasos | ✅ Completo | — (persistida en Supabase, tabla `attendance`) |
 | 6 | **Calendario e Importación Exprés (GesDeportiva)** | ❌ **No existe** | Tabla `matches`, importación Excel con UPSERT por `match_number`, Casa/Fuera real |
 | 7 | Comunicaciones y Canales | ✅ Completo | — (pulir cartelera/tablón) |
@@ -66,7 +66,8 @@ Falta:
 
 - ✅ Resubir la ficha **firmada en PDF** tras el reconocimiento médico (`FederativaDoc.tsx` → Storage `player-docs` + `registrations.federativa_pdf_url`/`federativa_status`).
 - ✅ El admin la valida con el **semáforo** como 5º documento en `ValidationConsole`.
-- ⏳ Descargar el **documento oficial**: botón *placeholder configurable* (`FEDERATIVA_TEMPLATE_URL`) listo para el PDF oficial cuando el club lo publique.
+- ✅ Descargar la ficha federativa **por jugador**: el admin sube el PDF cumplimentado de cada jugador (`PlayerDocuments.tsx` → `players.federativa_pdf_url`) y la familia/senior lo descarga desde `FederativaDoc.tsx` (sustituye a la plantilla en blanco genérica).
+- ✅ El admin sube además **foto** (`players.photo_url`) y **documento de identidad** (`players.id_document_url`) por jugador, y registra **tipo/número de documento** (`players.id_document_type`/`id_document_number`).
 
 ### 📋 Módulo 10 — Convocatorias — *casi completo (falta vínculo a partido)*
 
@@ -128,8 +129,8 @@ Es el núcleo deportivo del que dependen Convocatorias, Jornada y Cartelera.
 ### Fase 3 — Asistencia en Supabase (Módulo 5) · *media* — ✅ **Completada**
 1. ✅ Tabla `attendance` + RLS. 2. ✅ `Attendance.tsx` migrado de `localStorage` a Supabase (upsert por `player_id+team_id+date`) manteniendo el histórico mensual.
 
-### Fase 4 — Ficha Federativa PDF (Módulo 4) · *media* — ✅ **Completada** (falta publicar el PDF oficial)
-1. ⏳ Descarga del documento oficial — botón *placeholder configurable* (`FEDERATIVA_TEMPLATE_URL`) listo para enganchar el PDF cuando el club lo publique.
+### Fase 4 — Ficha Federativa PDF (Módulo 4) · *media* — ✅ **Completada**
+1. ✅ Descarga de la ficha **por jugador**: el admin sube el PDF cumplimentado (`PlayerDocuments.tsx` → `players.federativa_pdf_url`) y la familia/senior lo descarga en `FederativaDoc.tsx` (sustituye a la plantilla en blanco genérica). El admin gestiona también foto, documento de identidad y tipo/número de documento por jugador.
 2. ✅ Resubida del PDF firmado a Storage + `federativa_pdf_url`/`federativa_status` en `registrations` (`FederativaDoc.tsx`).
 3. ✅ Integrado como 5º documento en el semáforo de `ValidationConsole`.
 
