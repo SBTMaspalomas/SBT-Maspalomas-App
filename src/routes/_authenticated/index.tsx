@@ -19,11 +19,12 @@ import { TeamsManager } from "@/components/club/TeamsManager";
 import { ConvocatoriesManager } from "@/components/club/ConvocatoriesManager";
 import { ConvocatoriesPlayer } from "@/components/club/ConvocatoriesPlayer";
 import { FederativaDoc } from "@/components/club/FederativaDoc";
+import { PlayerDocuments } from "@/components/club/PlayerDocuments";
 import { DorsalManager } from "@/components/club/DorsalManager";
 import { EquipmentSizes } from "@/components/club/EquipmentSizes";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash, IdCard,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "dorsales" | "tallas";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "fichas" | "dorsales" | "tallas";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"] },
@@ -46,6 +47,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
   { id: "federativa", label: "Ficha federativa", icon: FileText, roles: ["family", "senior"] },
   { id: "miembros", label: "Miembros", icon: Users2, roles: ["admin"] },
+  { id: "fichas", label: "Fichas jugadores", icon: IdCard, roles: ["admin"] },
   { id: "equipos", label: "Equipos", icon: Zap, roles: ["admin"] },
   { id: "convocatorias", label: "Convocatorias", icon: ClipboardCheck, roles: ["admin", "coach"] },
   { id: "mis-convocatorias", label: "Mis Convocatorias", icon: ClipboardCheck, roles: ["player", "senior"] },
@@ -266,6 +268,7 @@ function ClubApp() {
               {view === "cartelera" && <NewsBoard />}
               {view === "registro" && <RegistrationFlow />}
               {view === "miembros" && auth.role === "admin" && <RoleManager />}
+              {view === "fichas" && auth.role === "admin" && <PlayerDocuments />}
               {view === "equipos" && auth.role === "admin" && <TeamsManager />}
               {view === "convocatorias" && (auth.role === "admin" || auth.role === "coach") && <ConvocatoriesManager />}
               {view === "mis-convocatorias" && auth.role === "player" && <ConvocatoriesPlayer />}

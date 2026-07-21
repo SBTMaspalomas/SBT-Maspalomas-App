@@ -7,11 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Upload, Download, FileText, CheckCircle2, Clock, XCircle, RefreshCw } from "lucide-react";
 
-// URL de la plantilla oficial en blanco de la Ficha Federativa Única.
-// PLACEHOLDER CONFIGURABLE: cuando el club publique el PDF oficial (en Storage o
-// en public/), poner aquí su URL y el botón «Descargar plantilla» se habilitará.
-const FEDERATIVA_TEMPLATE_URL = "";
-
 interface RegistrationRow {
   id: string;
   type: string;
@@ -20,36 +15,69 @@ interface RegistrationRow {
   federativa_status: string | null;
 }
 
+// Ficha federativa cumplimentada que el administrador sube por jugador a la tabla
+// `players` (bucket player-docs). La familia/senior la descarga desde aquí.
+interface PlayerFichaRow {
+  id: string;
+  full_name: string;
+  federativa_pdf_url: string | null;
+}
+
 const STATUS_UI: Record<string, { label: string; cls: string; icon: typeof Clock }> = {
-  pending: { label: "En revisión", cls: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30", icon: Clock },
-  approved: { label: "Aprobada", cls: "bg-green-500/10 text-green-500 border-green-500/30", icon: CheckCircle2 },
-  rejected: { label: "Rechazada", cls: "bg-red-500/10 text-red-500 border-red-500/30", icon: XCircle },
+  pending: {
+    label: "En revisión",
+    cls: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+    icon: Clock,
+  },
+  approved: {
+    label: "Aprobada",
+    cls: "bg-green-500/10 text-green-500 border-green-500/30",
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: "Rechazada",
+    cls: "bg-red-500/10 text-red-500 border-red-500/30",
+    icon: XCircle,
+  },
 };
 
 export function FederativaDoc() {
   const { user } = useAuth();
   const [registrations, setRegistrations] = useState<RegistrationRow[]>([]);
+  const [fichas, setFichas] = useState<PlayerFichaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("registrations")
-      .select("id, type, full_name, federativa_pdf_url, federativa_status")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true });
+    // Registros del usuario (para la subida de la ficha firmada) y fichas de sus
+    // jugadores (para la descarga del PDF que sube el admin). RLS limita los
+    // `players` visibles a los hijos de la familia y al propio jugador senior.
+    const [{ data, error }, { data: playersData, error: playersErr }] = await Promise.all([
+      supabase
+        .from("registrations")
+        .select("id, type, full_name, federativa_pdf_url, federativa_status")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true }),
+      supabase.from("players").select("id, full_name, federativa_pdf_url").order("full_name"),
+    ]);
     if (error) {
       toast.error("No se pudieron cargar tus registros");
       setLoading(false);
       return;
     }
+    if (playersErr) {
+      toast.error("No se pudieron cargar las fichas de tus jugadores");
+    }
     setRegistrations((data ?? []) as RegistrationRow[]);
+    setFichas((playersData ?? []) as PlayerFichaRow[]);
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleUpload = async (regId: string, file: File) => {
     if (!user) return;
@@ -98,23 +126,39 @@ export function FederativaDoc() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Documento oficial</CardTitle>
+          <CardTitle className="text-base">Descarga tu ficha federativa</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {FEDERATIVA_TEMPLATE_URL ? (
-            <a href={FEDERATIVA_TEMPLATE_URL} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="w-full sm:w-auto">
-                <Download className="mr-2 h-4 w-4" /> Descargar plantilla oficial
-              </Button>
-            </a>
+          <p className="text-xs text-muted-foreground">
+            El club prepara y sube la ficha federativa de cada jugador. Descárgala, fírmala tras el
+            reconocimiento médico y súbela firmada más abajo.
+          </p>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Cargando…</p>
+          ) : fichas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay jugadores a tu nombre todavía.</p>
           ) : (
             <div className="space-y-2">
-              <Button variant="outline" className="w-full sm:w-auto" disabled>
-                <Download className="mr-2 h-4 w-4" /> Descargar plantilla oficial
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                La plantilla oficial aún no está publicada. Podrás descargarla aquí en cuanto el club la habilite.
-              </p>
+              {fichas.map((f) => (
+                <div
+                  key={f.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface p-3"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate text-sm font-medium">{f.full_name}</span>
+                  </div>
+                  {f.federativa_pdf_url ? (
+                    <a href={f.federativa_pdf_url} target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline" size="sm">
+                        <Download className="mr-2 h-4 w-4" /> Descargar ficha
+                      </Button>
+                    </a>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Aún no disponible</span>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
@@ -167,7 +211,11 @@ export function FederativaDoc() {
                       className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium transition hover:bg-muted ${isUploading ? "pointer-events-none opacity-60" : ""}`}
                     >
                       <Upload className="h-4 w-4" />
-                      {isUploading ? "Subiendo…" : reg.federativa_pdf_url ? "Resubir PDF" : "Subir PDF firmado"}
+                      {isUploading
+                        ? "Subiendo…"
+                        : reg.federativa_pdf_url
+                          ? "Resubir PDF"
+                          : "Subir PDF firmado"}
                       <input
                         type="file"
                         accept="application/pdf"
