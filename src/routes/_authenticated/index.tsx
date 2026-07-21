@@ -18,9 +18,12 @@ import { FamilySelector } from "@/components/club/FamilySelector";
 import { TeamsManager } from "@/components/club/TeamsManager";
 import { ConvocatoriesManager } from "@/components/club/ConvocatoriesManager";
 import { ConvocatoriesPlayer } from "@/components/club/ConvocatoriesPlayer";
+import { FederativaDoc } from "@/components/club/FederativaDoc";
+import { DorsalManager } from "@/components/club/DorsalManager";
+import { EquipmentSizes } from "@/components/club/EquipmentSizes";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -33,7 +36,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "dorsales" | "tallas";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"] },
@@ -41,10 +44,13 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "mizona", label: "Mi zona", icon: Trophy, roles: [] },
   { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent", "family", "senior", "staff"] },
   { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
+  { id: "federativa", label: "Ficha federativa", icon: FileText, roles: ["family", "senior"] },
   { id: "miembros", label: "Miembros", icon: Users2, roles: ["admin"] },
   { id: "equipos", label: "Equipos", icon: Zap, roles: ["admin"] },
   { id: "convocatorias", label: "Convocatorias", icon: ClipboardCheck, roles: ["admin", "coach"] },
   { id: "mis-convocatorias", label: "Mis Convocatorias", icon: ClipboardCheck, roles: ["player", "senior"] },
+  { id: "dorsales", label: "Dorsales", icon: Hash, roles: ["admin", "coach"] },
+  { id: "tallas", label: "Tallas / Equipación", icon: Shirt, roles: ["family", "senior"] },
   { id: "validacion", label: "Validación docs.", icon: ShieldCheck, roles: ["admin"] },
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family", "senior"] },
   { id: "asistencia", label: "Control de asistencia", icon: ClipboardCheck, roles: ["coach"] },
@@ -264,6 +270,10 @@ function ClubApp() {
               {view === "convocatorias" && (auth.role === "admin" || auth.role === "coach") && <ConvocatoriesManager />}
               {view === "mis-convocatorias" && auth.role === "player" && <ConvocatoriesPlayer />}
               {view === "mis-convocatorias" && auth.role === "senior" && <ConvocatoriesPlayer playerId={auth.selfPlayerId ?? undefined} />}
+              {view === "federativa" && (auth.role === "family" || auth.role === "senior") && <FederativaDoc />}
+              {view === "dorsales" && (auth.role === "admin" || auth.role === "coach") && <DorsalManager />}
+              {view === "tallas" && auth.role === "family" && <EquipmentSizes />}
+              {view === "tallas" && auth.role === "senior" && <EquipmentSizes playerId={auth.selfPlayerId ?? undefined} />}
               {view === "validacion" && auth.role === "admin" && <ValidationConsole />}
               {view === "pagos" && auth.role === "admin" && <PaymentsAdmin />}
               {view === "pagos" && (auth.role === "parent" || auth.role === "family") && <PaymentsParent />}

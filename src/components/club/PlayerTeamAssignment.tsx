@@ -31,6 +31,7 @@ interface TeamRow {
 interface PlayerTeamRow {
   player_id: string;
   team_id: string;
+  dorsal: number | null;
 }
 
 export function PlayerTeamAssignment({ onChanged }: { onChanged?: () => void } = {}) {
@@ -50,7 +51,7 @@ export function PlayerTeamAssignment({ onChanged }: { onChanged?: () => void } =
         .select("id, full_name, team_id, family_id, birth_date, user_id")
         .order("full_name"),
       supabase.from("teams").select("id, name, category").order("name"),
-      supabase.from("player_teams").select("player_id, team_id"),
+      supabase.from("player_teams").select("player_id, team_id, dorsal"),
       supabase.from("families_meta").select("id, reference_code"),
     ]);
     if (p) setPlayers(p as PlayerRow[]);
@@ -84,6 +85,10 @@ export function PlayerTeamAssignment({ onChanged }: { onChanged?: () => void } =
   const isAssigned = (player: PlayerRow, teamId: string): boolean =>
     playerTeams.some((pt) => pt.player_id === player.id && pt.team_id === teamId) ||
     player.team_id === teamId;
+
+  // Dorsal asignado a un jugador en un equipo concreto (null si no tiene).
+  const dorsalFor = (playerId: string, teamId: string): number | null =>
+    playerTeams.find((pt) => pt.player_id === playerId && pt.team_id === teamId)?.dorsal ?? null;
 
   // Identificador visible del jugador: código de cuenta de familia o, para un
   // jugador adulto (SENIOR, sin familia), su nombre.
@@ -192,15 +197,19 @@ export function PlayerTeamAssignment({ onChanged }: { onChanged?: () => void } =
                       <p className="text-xs font-medium text-muted-foreground mb-1">Equipos</p>
                       {assignedTeams.length > 0 ? (
                         <div className="flex flex-wrap items-center gap-2">
-                          {assignedTeams.map((team) => (
-                            <Badge
-                              key={team.id}
-                              className="bg-primary/15 text-primary border-primary/30"
-                            >
-                              <Trophy className="h-3 w-3 mr-1" />
-                              {team.name} ({team.category})
-                            </Badge>
-                          ))}
+                          {assignedTeams.map((team) => {
+                            const dorsal = dorsalFor(player.id, team.id);
+                            return (
+                              <Badge
+                                key={team.id}
+                                className="bg-primary/15 text-primary border-primary/30"
+                              >
+                                <Trophy className="h-3 w-3 mr-1" />
+                                {team.name} ({team.category})
+                                {dorsal != null && <span className="ml-1 font-mono font-bold">#{dorsal}</span>}
+                              </Badge>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground italic">Sin asignar</p>
