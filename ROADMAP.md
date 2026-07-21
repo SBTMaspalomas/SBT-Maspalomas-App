@@ -31,10 +31,11 @@ Las **2 fases "en reserva"** (Galería y Estadísticas) siguen como *"Próximame
 | — | Galería Multimedia (reserva) | ⏳ Próximamente | Implementación completa |
 | — | Estadísticas Técnicas (reserva) | ⏳ Próximamente | Implementación completa |
 
-**Además — deuda técnica transversal:** los tipos de `registrations`,
+**Además — deuda técnica transversal:** ~~los tipos de `registrations`,
 `payments`, `convocatorias` y `convocatoria_responses` se usan en el código pero
 **no están versionados** en migraciones ni en `types.ts` (se acceden con
-`as any`). Debe saldarse antes de construir encima.
+`as any`)~~. ✅ **Saldada en la Fase 0**: estas tablas ya están versionadas en
+`supabase/migrations/` y tipadas en `types.ts` sin `as any`.
 
 ---
 
@@ -93,7 +94,7 @@ en Supabase** con RLS (coach de sus equipos / admin) y migrar la lectura/escritu
 
 ### 🧱 Deuda técnica transversal (bloqueante)
 
-- **Versionar tipos y migraciones** de `registrations`, `payments`, `convocatorias`, `convocatoria_responses`; regenerar `src/integrations/supabase/types.ts` y eliminar los `as any`.
+- ✅ **Versionar tipos y migraciones** de `registrations`, `payments`, `convocatorias`, `convocatoria_responses`; regenerar `src/integrations/supabase/types.ts` y eliminar los `as any`. *(Hecho en Fase 0.)*
 - **Cartelera/Tablón general** (`NewsBoard`) sigue como placeholder; `Board.tsx` y `PlayersList.tsx` existen pero no están enlazados en la navegación.
 
 ---
@@ -103,11 +104,19 @@ en Supabase** con RLS (coach de sus equipos / admin) y migrar la lectura/escritu
 Orden recomendado por dependencias y valor. Estimaciones en jornadas de
 desarrollo (orientativas).
 
-### Fase 0 — Saneamiento previo · *bloqueante* — ~2-3 días
+### Fase 0 — Saneamiento previo · *bloqueante* — ✅ **Completada**
 Base sana antes de construir módulos nuevos.
-1. Versionar migraciones de `registrations`, `payments`, `convocatorias`, `convocatoria_responses`.
-2. Regenerar `types.ts` y retirar los accesos `as any`.
-3. Integrar `useAuth` en Convocatorias (quitar los dos placeholders).
+1. ✅ Versionadas las migraciones de `registrations`, `payments`, `convocatorias`,
+   `convocatoria_responses` (más los objetos manuales previos: columnas de
+   `players`, `player_teams`, bucket `player-docs` y el RPC
+   `set_self_registration_role`). El SQL manual (`supabase/manual/…`) se promovió
+   al pipeline de migraciones y se retiró.
+2. ✅ `types.ts` completado (se añadieron las columnas del semáforo por documento
+   de `registrations`) y retirados los accesos `as any` sobre estas tablas. Queda
+   sólo un `as any` residual en `use-club-data` sobre `players.id_card_number`,
+   columna heredada que no existe en el esquema real (lectura legada tolerada).
+3. ✅ Convocatorias ya usan `useAuth` (`created_by = user.id`, `player_id` del
+   perfil activo); no quedaban placeholders `current_user_id`/`current_player_id`.
 
 ### Fase 1 — Calendario e Importación GesDeportiva (Módulo 6) · *alta prioridad* — ~5-7 días
 Es el núcleo deportivo del que dependen Convocatorias, Jornada y Cartelera.

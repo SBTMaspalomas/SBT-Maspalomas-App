@@ -112,7 +112,7 @@ async function loadFamily(userId: string): Promise<FamilyInfo | null> {
   return {
     id: fam.id,
     reference_code: fam.reference_code,
-    adult_pin: (fam as any).adult_pin ?? null,
+    adult_pin: fam.adult_pin ?? null,
     children: (kids ?? []) as FamilyChild[],
   };
 }

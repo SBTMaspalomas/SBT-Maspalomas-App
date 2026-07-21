@@ -238,7 +238,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
             full_name: `${child.firstName} ${child.lastName}`,
             birth_date: child.birthDate,
             team_id: child.teamId || null,
-          } as any);
+          });
           if (playerErr) throw playerErr;
         }
 
@@ -267,7 +267,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       //    (un usuario no puede escribir en user_roles directamente por RLS). Si el
       //    RPC aún no existe en la BD, el registro no falla: el admin ajustará el rol.
       const desiredRole = ROLE_BY_TYPE[adult.adultType];
-      const { error: roleErr } = await supabase.rpc("set_self_registration_role", { _role: desiredRole } as any);
+      const { error: roleErr } = await supabase.rpc("set_self_registration_role", { _role: desiredRole });
       if (roleErr) console.warn("No se pudo asignar el rol de registro:", roleErr.message);
 
       toast.success("Registro completado exitosamente");

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -82,7 +83,7 @@ export function ValidationConsole() {
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("registrations" as any)
+      .from("registrations")
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -99,12 +100,12 @@ export function ValidationConsole() {
 
   const updateDocStatus = async (id: string, field: DocField, status: DocStatus, rejectReason?: string) => {
     setSavingField(`${id}-${field}`);
-    const updateData: Record<string, any> = { [field]: status };
+    const updateData: TablesUpdate<"registrations"> = { [field]: status };
     if (status === "rejected" && rejectReason) {
       updateData.reject_reason = rejectReason;
     }
     const { error } = await supabase
-      .from("registrations" as any)
+      .from("registrations")
       .update(updateData)
       .eq("id", id);
 
@@ -120,7 +121,7 @@ export function ValidationConsole() {
       const updated = { ...reg, [field]: status };
       const overall = computeOverallStatus(updated);
       await supabase
-        .from("registrations" as any)
+        .from("registrations")
         .update({ doc_status: overall, ...(status !== "rejected" ? {} : { reject_reason: rejectReason || null }) })
         .eq("id", id);
     }
@@ -133,7 +134,7 @@ export function ValidationConsole() {
   const approveAll = async (id: string) => {
     setSavingField(`${id}-all`);
     const { error } = await supabase
-      .from("registrations" as any)
+      .from("registrations")
       .update({
         photo_status: "approved",
         dni_front_status: "approved",
