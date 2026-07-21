@@ -78,6 +78,11 @@ sin pérdida de funcionalidad existente.
 - [ ] **No se ha omitido ninguna instrucción o modificación solicitada.** No se
       puede "olvidar" ni "pasar por alto" nada de lo pedido; de hacerlo habría que
       volver a especificarlo en la siguiente actualización.
+- [ ] **La especificación de producto está actualizada.** Si el cambio implementa
+      algo nuevo sustancial (nueva funcionalidad, flujo, rol, tabla, ruta, Edge
+      Function o cambio de comportamiento visible), queda reflejado en
+      [`PRODUCT_SPEC.md`](./PRODUCT_SPEC.md) (ver sección
+      «Documentación de producto»).
 
 ### Comandos de validación de este repositorio
 
@@ -96,6 +101,34 @@ bun run build               # build de producción (vite build) — debe compila
 Para cambios de base de datos revisa siempre `supabase/migrations/` y
 `supabase/config.toml`: cada nueva migración debe ser aditiva, idempotente cuando
 sea posible, y coherente con las políticas RLS existentes.
+
+## Documentación de producto (OBLIGATORIO)
+
+**Cada vez que implementes algo nuevo sustancial, debes reflejarlo en
+[`PRODUCT_SPEC.md`](./PRODUCT_SPEC.md) como parte de la misma tarea**, no como un
+paso opcional posterior. `PRODUCT_SPEC.md` es la fuente única de verdad que
+describe **todo lo implementado** en la aplicación; si el código y la spec
+divergen, la tarea no está terminada.
+
+Se considera «sustancial» y debe documentarse, entre otros:
+
+- Nueva funcionalidad, pantalla o flujo de usuario.
+- Nuevo rol, permiso o cambio en la matriz de autorización.
+- Nueva ruta, componente o sección relevante de la aplicación.
+- Nueva tabla, columna, política RLS, trigger, migración o Edge Function.
+- Cambios en el comportamiento visible o en las reglas de negocio existentes.
+
+Al actualizar la spec:
+
+1. Añade o modifica la sección correspondiente describiendo **qué hace** y **cómo
+   está implementado** (archivos, tablas o servicios implicados).
+2. Actualiza la fecha de **«Última revisión del código»** y la rama en la cabecera
+   del documento.
+3. Si lo implementado cierra un punto pendiente, refléjalo también en
+   [`ROADMAP.md`](./ROADMAP.md) para mantener ambos documentos coherentes.
+
+No se admite dejar `PRODUCT_SPEC.md` desactualizado tras un cambio sustancial: de
+hacerlo, la modificación se considera incompleta.
 
 ## Forma de trabajar
 
