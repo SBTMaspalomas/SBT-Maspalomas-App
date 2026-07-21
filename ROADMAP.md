@@ -69,6 +69,7 @@ partidos.
 - ✅ El admin la valida con el **semáforo** como 5º documento en `ValidationConsole`.
 - ✅ Descargar la ficha federativa **por jugador**: el admin sube el PDF cumplimentado de cada jugador (`PlayerDocuments.tsx` → `players.federativa_pdf_url`) y la familia/senior lo descarga desde `FederativaDoc.tsx` (sustituye a la plantilla en blanco genérica).
 - ✅ El admin sube además **foto** (`players.photo_url`) y **documento de identidad** (`players.id_document_url`) por jugador, y registra **tipo/número de documento** (`players.id_document_type`/`id_document_number`).
+- ✅ **Alta e importación de jugadores** por el admin (`PlayerImport.tsx`, embebido en «Fichas jugadores»): alta **manual**, **importación CSV** con indicador de estructura + plantilla descargable (`src/lib/playersCsv.ts`), y **vinculación masiva de fotos desde un ZIP** cuyo nombre de fichero es el identificador del jugador (nº de documento / nombre; lector ZIP sin dependencias en `src/lib/zip.ts`).
 
 ### 📋 Módulo 10 — Convocatorias — *casi completo (falta vínculo a partido)*
 
