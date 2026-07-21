@@ -2,7 +2,9 @@
 
 > Documento técnico-funcional que describe **todo lo implementado** en la aplicación de gestión del club de baloncesto **SBT Maspalomas** ("El Baloncesto en el Sur · Gran Canaria").
 >
-> Última revisión del código: rama `claude/product-spec-doc-u93sm9`.
+> Última revisión del código: **2026-07-21** (rama `claude/session-ayxoss`). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`) y las cuotas editables.
+>
+> El plan de lo que **falta** por construir frente al plan de inicio del proyecto vive en un documento aparte, [`ROADMAP.md`](./ROADMAP.md).
 
 ---
 
@@ -85,18 +87,27 @@ Enrutado basado en ficheros (TanStack Router). Árbol generado en `src/routeTree
 
 ### 5.1 Roles (`app_role` enum)
 
-`admin` · `coach` · `parent` · `player` · `family`
+`admin` · `coach` · `parent` · `player` · `family` · `senior` · `staff`
 
-El registro público crea siempre cuentas de rol **family** (padres/tutores); las cuentas de **admin** y **coach** las gestiona el club. Hay bootstrap automático a `admin` para los emails `admin@club.com` / `admin@club.es` (trigger `handle_new_user`).
+Los valores `senior` y `staff` se añadieron en migración propia (`20260720100000_add_senior_staff_roles.sql`, con `ADD VALUE IF NOT EXISTS`). En la práctica la tabla `user_roles` solo admite cinco de ellos por `CHECK`: **`admin`, `coach`, `family`, `senior`, `staff`** (`parent`/`player` existen en el enum como legado pero no se asignan hoy).
+
+- **`family`** — Adulto responsable de uno o varios menores (rol del registro público por defecto).
+- **`senior`** — Jugador adulto (+18) que se registra a sí mismo; crea su propia ficha en `players` (`players.user_id`).
+- **`coach`** — Entrenador (equipos vía `coach_teams`).
+- **`staff`** — Otras funciones del club (delegados, directiva…).
+- **`admin`** — Administración del club.
+
+Las cuentas de **admin** y **coach** las gestiona el club; el resto se autoasignan en el registro. Hay bootstrap automático a `admin` para los emails `admin@club.com` / `admin@club.es` (trigger `handle_new_user`).
 
 ### 5.2 `AuthProvider` (`src/lib/auth-context.tsx`)
 
-Contexto central que expone: `session`, `user`, `role`, `fullName`, `family`, `activeProfile`, `loading` y acciones `selectAdult(pin)`, `selectChild(id)`, `clearProfile()`, `signOut()`.
+Contexto central que expone: `session`, `user`, `role` (rol principal), `roles` (todos los roles del usuario), `fullName`, `family`, `activeProfile`, `selfPlayerId` (ficha propia del jugador Senior) y `loading`; y las acciones `selectAdult(pin)`, `selectChild(id)`, `clearProfile()`, `signOut()`.
 
 Al iniciar sesión:
-1. `loadRoleAndProfile()` — lee `user_roles`, `profiles` y `coach_teams` en paralelo. Prioriza rol: **admin > coach > parent > player > family**.
+1. `loadRoleAndProfile()` — lee `user_roles`, `profiles` y `coach_teams` en paralelo. Un usuario puede tener **varios roles**; el rol principal se elige por prioridad: **admin > coach > family > senior > staff > parent > player** (el *responsable* manda sobre *senior*/*staff* cuando coexisten, para que un adulto que además juega entre por el flujo de familia).
 2. Si el rol es `family`, `loadFamily()` carga `families_meta` (código de referencia, PIN) y los `players` (hijos/as) vinculados.
-3. Puente al *demo store*: mapea el rol real a un usuario demo para que las vistas heredadas sigan funcionando.
+3. Si entre sus roles está `senior`, resuelve su **ficha de jugador propia** (`players.user_id = auth.uid()`) y la expone como `selfPlayerId` para cuotas, equipos y convocatorias.
+4. Puente al *demo store*: mapea el rol real a un usuario demo para que las vistas heredadas sigan funcionando (`senior`→jugador, `staff`→coach demo).
 
 ### 5.3 Perfiles de familia (estilo Netflix)
 
@@ -125,7 +136,7 @@ Para roles `family` / `parent`, al entrar se consulta la tabla `registrations` (
 
 ### 6.2 Navegación por rol
 
-Menú lateral filtrado según el rol efectivo (un perfil hijo se trata como `player`):
+Menú lateral filtrado según el rol efectivo (un perfil hijo se trata como `player`). Desde la vista de **Equipos** el admin accede además a la **asignación de jugadores a equipos** (fusionada dentro del panel de Equipos) y al **gestor de chats** (`ChatsManager`, §7.15):
 
 | Vista | admin | coach | parent | player | family |
 |-------|:---:|:---:|:---:|:---:|:---:|
@@ -135,7 +146,6 @@ Menú lateral filtrado según el rol efectivo (un perfil hijo se trata como `pla
 | Registro federativo | ✔ | | ✔ | | ✔ |
 | Miembros (RoleManager) | ✔ | | | | |
 | Equipos (TeamsManager) | ✔ | | | | |
-| Asignar Equipos | ✔ | | | | |
 | Convocatorias | ✔ | ✔ | | | |
 | Mis Convocatorias | | | | ✔ | |
 | Validación docs. | ✔ | | | | |
@@ -157,8 +167,12 @@ Menú lateral filtrado según el rol efectivo (un perfil hijo se trata como `pla
 
 Asistente multi-paso con firma digital y subida de documentación:
 
-- **Paso 1 — Datos personales del adulto**: nombre, apellidos, tipo (DNI/Pasaporte) y nº de documento, fecha de nacimiento, teléfono, email, y checkbox *"Soy adulto responsable de un menor"*.
-- **Paso 2 — Menores a cargo** (si es responsable): alta de uno o varios hijos (nombre, apellidos, fecha de nacimiento, documento y **selección de equipo** desde `teams`). Lista editable con opción de eliminar.
+- **Paso 1 — Datos personales del adulto**: nombre, apellidos, tipo (DNI/Pasaporte) y nº de documento, fecha de nacimiento, teléfono, email, y un **selector de tipo de usuario** que determina el rol y el flujo:
+  - **Adulto responsable de un menor** → rol `family` (ve la sección de hijos, documentos de menores y PIN de adulto).
+  - **Jugador Senior (+18)** → rol `senior`: se registra como jugador de sí mismo, ve su cuota y sus convocatorias; no gestiona hijos.
+  - **Entrenador** → rol `coach`. **Staff / otras funciones** → rol `staff`. Ni entrenador ni staff ven cuotas ni sección de menores.
+  Los no responsables no llevan PIN y se identifican por nombre + apellido.
+- **Paso 2 — Menores a cargo** (solo tipo responsable): alta de uno o varios hijos (nombre, apellidos, fecha de nacimiento, documento y **selección de equipo** desde `teams`). Lista editable con opción de eliminar.
 - **Paso 3 — Documentación y autorizaciones**:
   - Foto carnet, DNI anverso y DNI reverso (subida a Storage bucket `player-docs`).
   - **Autorizaciones**: derechos de imagen, traslados en vehículos privados, asistencia médica de emergencia (para menores) y **autorización obligatoria de cesión de datos** a federaciones/seguros/etc.
@@ -170,7 +184,9 @@ Al enviar:
 3. Subida de archivos a Storage y obtención de URLs públicas.
 4. Inserción del registro del **adulto** en `registrations` (`type: 'adult'`, `doc_status: 'pending'`).
 5. Inserción de cada **menor** en `registrations` (`type: 'minor'`, con `parent_registration_id`) **y** en `players` (con `team_id`).
-6. Generación automática del **identificador de cuenta**: `Apellido.Inicial-NN` (secuencia incremental buscando prefijos existentes; ej. `Perez.L-01`).
+6. Si el tipo es **Senior**, creación de su **propia ficha de jugador** en `players` vinculada por `players.user_id` (para cuotas/equipos/convocatorias).
+7. Fijación del **rol principal** según el tipo elegido mediante la RPC `set_self_registration_role` (`SECURITY DEFINER`).
+8. Generación automática del **identificador de cuenta**: `Apellido.Inicial-NN` (secuencia incremental buscando prefijos existentes; ej. `Perez.L-01`).
 
 **Firma digital — `SignaturePad.tsx`**: canvas 600×200 con captura por puntero (dedo/ratón), exporta PNG en data-URL, botón de borrado.
 
@@ -215,7 +231,7 @@ El pago único aplica un descuento sobre el total a plazos (Senior −30€, Fed
 
 ### 7.4 Equipos — `TeamsManager.tsx` (solo admin)
 
-CRUD de equipos (`teams`): crear, editar y eliminar (nombre + categoría). Cada tarjeta muestra el recuento de jugadores y un preview de hasta 3 nombres.
+CRUD de equipos (`teams`): crear, editar y eliminar (nombre + categoría). Cada tarjeta muestra el recuento de jugadores y un preview de hasta 3 nombres. Desde este panel el admin también accede, mediante botones de cabecera, a la **asignación de jugadores a equipos** (§7.5, ya no es una entrada de menú independiente) y a **"Gestionar chats"**, que abre el `ChatsManager` (§7.15).
 
 ### 7.5 Asignación de jugadores a equipos — `PlayerTeamAssignment.tsx` (solo admin)
 
@@ -250,13 +266,24 @@ Panel de administración de usuarios registrados:
 
 ### 7.9 Vista de jugador/familia — `PlayerView.tsx`
 
-Panel del jugador (o del perfil hijo seleccionado) con pestañas:
-- **Jornada**: próximo partido con hora, local/visitante y enlace a Google Maps si es fuera.
-- **Calendario**: listado de partidos ordenados.
-- **Clasificación**: tabla desde `standings` (posición, G, P, Pts).
-- **Eventos**: desde `club_events` (torneos, campus, etc.).
-- **Tablón**: anuncios.
-- **Galería** y **Stats**: marcadas como *"Próximamente"*.
+Panel del jugador (o del perfil hijo seleccionado vía prop `childId`). La cabecera muestra el nombre del jugador/a y el **nombre legible de su(s) equipo(s)** — resuelto cruzando `players.team_id` y la tabla puente `player_teams` contra `teams` (`nombre (categoría)`), de modo que nunca se pinta el UUID en crudo. A continuación, seis pestañas cuyo **origen de datos difiere** (importante, porque no todo sale de Supabase):
+
+| Pestaña | Fuente de datos | Estado |
+|---------|-----------------|--------|
+| **Jornada** | *Demo store* `localStorage` (`useClub((s) => s.matches)`) | ⚠️ Datos demo |
+| **Calendario** | *Demo store* `localStorage` (mismos `matches`) | ⚠️ Datos demo |
+| **Clasificación** | Supabase `standings` (filtrado por el UUID del equipo) | ✅ Real |
+| **Eventos** | Supabase `club_events` (`order by event_date`) | ✅ Real |
+| **Tablón** | *Demo store* `announcements`, que `useClubData` **hidrata desde `club_events`** | ✅ Real (vía puente) |
+| **Galería** / **Stats** | — | ⏳ *"Próximamente"* (placeholder) |
+
+Detalle de cada fuente:
+
+- **Jornada** y **Calendario** — leen el array `matches` del **store demo en `localStorage`** (`clubStore.ts`), **no** de Supabase. Ese array **arranca vacío** y hoy **ningún proceso lo hidrata** desde la base de datos (`useClubData` solo carga `teams`, `players` y `club_events`), por lo que en la práctica estas pestañas muestran *"No hay próxima jornada programada"* / *"Sin partidos en el calendario"* salvo que se inyecten partidos en el store local. Además el filtrado por equipo es una **heurística cableada** por nombre (`"mini a"`→`t1`, `"cadete"`→`t2`). *Jornada* toma el primer partido tras ordenar por fecha+hora, pinta la etiqueta **EN CASA/FUERA** (`match.venue`) y, si es `away` y hay `address`, un enlace a **Google Maps** (`https://www.google.com/maps/search/?api=1&query=<address>`). → Su sustitución por una tabla real `matches` es el **Módulo 6** del [`ROADMAP.md`](./ROADMAP.md).
+- **Clasificación** — tabla `standings` de Supabase, filtrada por el **UUID del equipo** del jugador (se resuelve antes contra `teams`, ya que `players.team_id` puede almacenar un UUID o el nombre del equipo, evitando el error `22P02`). Columnas: posición, equipo rival, G, P, Pts.
+- **Eventos** — tabla `club_events` de Supabase (torneos, campus, etc.), ordenada por fecha.
+- **Tablón** — lee `announcements` del store demo, **pero** ese array **sí** está poblado: `useClubData` mapea cada fila de `club_events` a un anuncio (`title`/`description`/`event_date`). Es decir, *Eventos* y *Tablón* comparten origen real (`club_events`) por dos caminos distintos.
+- **Galería** y **Stats** — recuadros *"Próximamente"* (componente `ComingSoon`); sin datos ni lógica todavía.
 
 ### 7.10 Selector de familia — `FamilySelector.tsx`
 
@@ -271,20 +298,24 @@ Subida de avatar para jugadores o perfiles: validación de tipo (JPG/PNG/WebP) y
 
 ### 7.12 Chats — `Chats.tsx`
 
-Mensajería en **tiempo real** (Supabase Realtime) con cuatro tipos de canal:
+Mensajería en **tiempo real** (Supabase Realtime) con estos tipos de canal:
 
 - **`team`** — chat del equipo (jugadores + staff), oculto para categorías **U12**.
 - **`family`** — chat de familias de un equipo (adultos responsables + staff).
 - **`broadcast`** — canal de difusión del club (escritura solo admin/coach).
 - **`private`** — conversación privada 1-a-1 entre **administración y una familia** (solo visible en el perfil de Adultos Responsables).
+- **Canales de rol** (nuevos): **`admins`** (Administradores), **`coaches`** (Entrenadores) y **`staff`** (Staff). Son canales de grupo **sin equipo asociado** (`team_id NULL`) que reutilizan la tabla `team_messages`. Se muestran según el **array de roles** del usuario (un usuario puede tener varios): el admin participa en los tres; entrenadores y staff, en el suyo.
 
 La construcción de la lista de canales depende del rol:
-- **Admin**: canal de equipo y de familias por cada equipo, difusión, y un canal privado por familia.
-- **Coach**: canales de sus equipos asignados + difusión.
+- **Admin**: canales de rol (admins/coaches/staff), canal de equipo y de familias por cada equipo, difusión, y un canal privado por familia.
+- **Coach**: canal `coaches`, canales de sus equipos asignados + difusión.
+- **Staff**: canal `staff` + difusión.
 - **Family**: canal de familias por equipo de cada hijo, difusión (solo lectura) y canal privado con administración; el perfil hijo solo ve el chat de equipo si **no** es U12.
 - **Player**: chat de su equipo si no es U12.
 
-Reglas de acceso reforzadas en base de datos (RLS + función `user_can_access_team_channel`). Marca de leídos en mensajes privados. Escucha el evento `open-private-chat` para saltar a la conversación con una familia concreta.
+**Estado efectivo de cada canal** (`lib/chatChannels.ts` + tabla `chat_channels`): cada canal puede estar `enabled`/deshabilitado y en estado `open` / `closed` / `archived`. La **ausencia de fila equivale a activo y abierto** (compatibilidad hacia atrás). El visor aplica esa configuración: oculta los deshabilitados y los archivados, y marca los cerrados como **solo lectura**. La gestión de estos estados la realiza el admin desde `ChatsManager` (§7.15).
+
+Reglas de acceso reforzadas en base de datos (RLS + función `user_can_access_team_channel`, ampliada para conceder acceso `admins→admin`, `coaches→coach`, `staff→staff`). La escritura además exige que el canal esté abierto (`chat_channel_open`). Marca de leídos en mensajes privados. Escucha el evento `open-private-chat` para saltar a la conversación con una familia concreta.
 
 ### 7.13 Cartelera / Tablón
 
@@ -294,6 +325,15 @@ Reglas de acceso reforzadas en base de datos (RLS + función `user_can_access_te
 ### 7.14 `PlayersList.tsx`
 
 Listado de jugadores con estadísticas de estado documental y búsqueda. Opera sobre el *demo store*; no está enlazado en la navegación actual.
+
+### 7.15 Gestión de chats — `ChatsManager.tsx` (solo admin)
+
+Consola que da al administrador control sobre el **ciclo de vida de cada canal**, accesible desde el botón "Gestionar chats" de `TeamsManager`. Persiste en la tabla `chat_channels` (upsert por `channel_key`):
+
+- **Canales generales**: Difusión y los tres canales de rol (Administradores, Entrenadores, Staff).
+- **Canales por equipo y familia**: por cada equipo, su chat de equipo (salvo U12, que solo tiene familias) y su chat de familias.
+
+Por cada canal ofrece: **activar/desactivar** (`enabled`), cambiar el **estado** (`open` = abierto · `closed` = solo lectura · `archived` = archivado/oculto) y **eliminar** — que borra el **historial de mensajes** (`team_messages` filtrados por `channel_type`/`team_id`) y deja el canal desactivado, con diálogo de confirmación por ser irreversible. La lógica de claves y estado efectivo se comparte con el visor vía `lib/chatChannels.ts`.
 
 ---
 
@@ -313,26 +353,30 @@ Tablas con **Row Level Security (RLS)** activada:
 | `user_roles` | Roles por usuario (enum `app_role`) | Lectura propia; admin gestiona todos |
 | `coach_teams` | Equipos asignados a un entrenador | Admin gestiona; coach lee lo suyo |
 | `teams` | Equipos (nombre, categoría, `age_category`) | Lectura para autenticados; admin gestiona |
-| `players` | Jugadores (nombre, fecha nac., `team_id`, `family_id`, avatar) | Familia lee sus hijos; coach lee todos; admin gestiona |
+| `players` | Jugadores (nombre, fecha nac., `team_id`, `family_id`, `avatar_url`, `user_id`) | Familia lee/edita sus hijos; el propio jugador Senior gestiona su ficha (`user_id = auth.uid()`); coach lee todos; admin gestiona |
+| `player_teams` | Puente jugador↔equipo (**multi-equipo**) | Lectura autenticados; admin gestiona |
 | `families_meta` | Ficha de familia (head, email, `reference_code`, `adult_pin`) | Familia lee/gestiona la suya; admin todo |
 | `standings` | Clasificación por equipo | Lectura autenticados; admin gestiona |
 | `club_events` | Eventos del club (torneos, campus…) | Lectura autenticados; admin gestiona |
-| `team_messages` | Mensajes de canales team/family/broadcast | Controlado por `user_can_access_team_channel` |
-| `private_messages` | Mensajes privados admin↔familia | Solo admin y familia receptora |
+| `team_messages` | Mensajes de canales team/family/broadcast/admins/coaches/staff | Controlado por `user_can_access_team_channel` + `chat_channel_open`; admin puede borrar |
+| `chat_channels` | Config/estado de cada canal (`channel_key`, `kind`, `enabled`, `status`) | Lectura autenticados; gestión solo admin |
+| `private_messages` | Mensajes privados admin↔familia | Solo admin y familia receptora; admin puede borrar |
 | `registrations`* | Registros federativos (adulto/menor, docs, autorizaciones, estados por documento) | Usado por RegistrationFlow y ValidationConsole |
 | `payments`* | Cuotas y pagos (importe, periodo, estado, comprobante) | Admin gestiona; familia ve los suyos |
 | `fee_schedules` | Importes y fechas límite de cada tipo de cuota (senior/federado/escuela) | Admin edita; todos leen |
 | `convocatorias`* | Convocatorias de entreno/partido | Manager/Player |
 | `convocatoria_responses`* | Respuestas de jugadores a convocatorias | Manager/Player |
 
-\* Tablas referenciadas en el código pero **no presentes en los tipos generados** (`src/integrations/supabase/types.ts`) ni en las migraciones incluidas en el repositorio — ver §10.
+\* Tablas referenciadas en el código y **presentes ya en los tipos generados** (`src/integrations/supabase/types.ts`), pero cuya migración `CREATE TABLE` **no está versionada** en `supabase/migrations/` (viven en la BD de Lovable y parcialmente en `supabase/manual/`) — ver §8.5 y §10.
 
 **Funciones y triggers relevantes**:
 - `handle_new_user()` — crea `profiles` + rol por defecto (`family`, o `admin` para emails bootstrap) y auto-vincula familias por email.
 - `has_role(user, role)` — helper `SECURITY DEFINER` usado en las políticas RLS.
+- `set_self_registration_role()` — RPC `SECURITY DEFINER` que fija el rol principal del propio usuario al terminar el registro (responsable/senior/coach/staff).
 - `compute_family_reference_code()` + trigger `refresh_family_reference_code` — genera el código de familia a partir del hijo mayor.
 - `derive_age_category()` — deriva `U12` / `U14+` a partir de la categoría del equipo.
-- `user_can_access_team_channel()` — autoriza acceso a canales de chat (incluye la regla de que los menores U12 no tienen chat de equipo).
+- `user_can_access_team_channel()` — autoriza acceso a canales de chat (menores U12 sin chat de equipo; canales de rol `admins`/`coaches`/`staff`).
+- `chat_channel_open(kind, team_id)` — indica si un canal admite escritura ahora mismo (activo y `open`); ausencia de fila ⇒ `true`.
 - `update_updated_at_column()` — mantiene `updated_at`.
 
 ### 8.3 Storage
@@ -344,6 +388,10 @@ Tablas con **Row Level Security (RLS)** activada:
 
 Publicación `supabase_realtime` incluye `team_messages` y `private_messages`. `useClubData` también se suscribe a cambios de esquema para refrescar el store demo.
 
+### 8.5 SQL manual (`supabase/manual/`)
+
+Además de las migraciones automáticas, el repo incluye la carpeta `supabase/manual/` con SQL **aditivo e idempotente que se aplica a mano** en el editor de Supabase/Lovable (no forma parte del pipeline de migraciones). El fichero `2026-07-19_registro_paneles_fixes.sql` reúne los cambios de la tanda de registro/paneles: valores de enum `senior`/`staff`, `CHECK` ampliado de `user_roles`, columnas `players.avatar_url` y `players.user_id` (con sus políticas RLS para que el Senior gestione su ficha y la familia edite a sus hijos) y demás ajustes. Debe ejecutarse por bloques (los `ALTER TYPE … ADD VALUE` van en su propia transacción).
+
 ---
 
 ## 9. Reglas de negocio destacadas
@@ -351,25 +399,29 @@ Publicación `supabase_realtime` incluye `team_messages` y `private_messages`. `
 - **Registro obligatorio**: sin registro federativo de adulto, la familia no accede al panel.
 - **Identificador de cuenta** autogenerado `Apellido.Inicial-NN` (p. ej. `Perez.L-01`).
 - **Categoría U12**: los menores de categoría U12 **no** tienen chat de equipo; su comunicación pasa por el chat de familias con los adultos responsables (aplicado tanto en UI como en RLS).
-- **Prioridad de roles**: admin > coach > parent > player > family.
+- **Prioridad de roles**: admin > coach > family > senior > staff > parent > player (el *responsable* prevalece sobre *senior*/*staff* cuando coexisten).
+- **Jugador Senior**: un adulto +18 se registra como jugador de sí mismo (`players.user_id`) y ve su propia cuota, equipos y convocatorias.
 - **Aprobación documental granular**: cada documento del registro se aprueba/rechaza por separado y el estado global se deriva.
 - **PIN de adulto** configurable por familia (`adult_pin`), con fallback demo `1234`.
 - **Canal de difusión**: solo escriben admin/coach; las familias lo tienen en modo lectura.
+- **Ciclo de vida de los chats**: el admin puede activar/desactivar, cerrar (solo lectura), archivar (ocultar) o eliminar cualquier canal; la ausencia de configuración equivale a activo y abierto.
 
 ---
 
 ## 10. Estado del desarrollo, deuda técnica y pendientes
 
-**Implementado y funcional** (contra Supabase): autenticación, registro federativo, validación documental, gestión de equipos, asignación de jugadores, gestión de miembros/roles, pagos (admin y familia), chats en tiempo real (team/family/broadcast/privado), selector de familia con PIN, avatares.
+**Implementado y funcional** (contra Supabase): autenticación, registro federativo con tipos de usuario (responsable/senior/coach/staff), validación documental, gestión de equipos, asignación de jugadores (multi-equipo), gestión de miembros/roles, pagos con cuotas editables (admin y familia), chats en tiempo real (team/family/broadcast/privado + canales de rol) y su gestión por el admin, selector de familia con PIN, avatares.
 
 **Puntos de atención / deuda técnica**:
-1. **Tipos desincronizados**: `registrations`, `payments`, `convocatorias` y `convocatoria_responses` se usan en el código pero no aparecen en `types.ts` ni en las migraciones versionadas del repo (se accede a algunas con `as any` / `"tabla" as any`). Conviene regenerar los tipos y versionar sus migraciones.
+1. **Migraciones no versionadas**: `registrations`, `payments`, `convocatorias`, `convocatoria_responses`, `player_teams` y `chat_channels` **ya figuran en `types.ts`**, pero la migración `CREATE TABLE` de varias de ellas no está en `supabase/migrations/` (vive en la BD de Lovable / `supabase/manual/`). Conviene versionar esas migraciones para reproducir el esquema desde cero.
 2. **Convocatorias con placeholders**: `created_by` y `player_id` están cableados (`"current_user_id"`, `"current_player_id"`) — falta integrarlos con `useAuth`.
 3. **Asistencia en localStorage**: `Attendance.tsx` no persiste en base de datos todavía.
-4. **Datos demo**: partidos (`matches`), anuncios y parte de la agenda provienen del *demo store* en `localStorage`, no de Supabase.
+4. **Partidos en datos demo**: la **Jornada** y el **Calendario** de `PlayerView` leen `matches` del *demo store* (`localStorage`), array que hoy arranca vacío y **no se hidrata** desde Supabase. Es el núcleo del **Módulo 6 (Calendario/GesDeportiva)** pendiente — ver [`ROADMAP.md`](./ROADMAP.md).
 5. **Secciones "Próximamente"**: Galería y Stats en `PlayerView`, y `NewsBoard` (tablón general).
 6. **Componentes no enlazados**: `Board.tsx` y `PlayersList.tsx` existen como base pero no están en la navegación actual.
 7. El botón *"Reiniciar datos demo"* en la cabecera resetea el store local (utilidad de desarrollo).
+
+> El plan priorizado de lo que falta (Calendario/GesDeportiva, Equipaciones, Ficha Federativa PDF, Convocatorias completas, Asistencia en Supabase, etc.) se mantiene en [`ROADMAP.md`](./ROADMAP.md).
 
 ### Fases (según README)
 
@@ -410,9 +462,10 @@ src/
 │       ├── route.tsx          # Guard de sesión
 │       └── index.tsx          # ClubApp (app principal)
 ├── components/
-│   ├── club/                  # Módulos de dominio (17 componentes)
+│   ├── club/                  # Módulos de dominio (19 componentes)
 │   │   ├── RegistrationFlow.tsx   ValidationConsole.tsx
-│   │   ├── Payments.tsx           Chats.tsx
+│   │   ├── Payments.tsx           CuotaAnual.tsx
+│   │   ├── Chats.tsx              ChatsManager.tsx
 │   │   ├── TeamsManager.tsx       PlayerTeamAssignment.tsx
 │   │   ├── RoleManager.tsx        Attendance.tsx
 │   │   ├── ConvocatoriesManager.tsx  ConvocatoriesPlayer.tsx
@@ -421,8 +474,9 @@ src/
 │   │   ├── NewsBoard.tsx          Board.tsx  PlayersList.tsx
 │   └── ui/                    # shadcn/ui (primitivas)
 ├── lib/
-│   ├── auth-context.tsx       # AuthProvider + perfiles de familia
+│   ├── auth-context.tsx       # AuthProvider + perfiles de familia + roles
 │   ├── clubStore.ts           # Store demo (localStorage)
+│   ├── chatChannels.ts        # Claves/estado efectivo de canales de chat
 │   └── utils.ts, error-*.ts
 ├── hooks/
 │   ├── use-club-data.tsx      # Hidratación del store desde Supabase
@@ -434,8 +488,9 @@ src/
 └── server.ts, start.ts, router.tsx
 
 supabase/migrations/           # Esquema, RLS, triggers, funciones, seeds
+supabase/manual/               # SQL aditivo para aplicar a mano (§8.5)
 ```
 
 ---
 
-*Documento generado a partir del análisis del código fuente de la rama `claude/product-spec-doc-u93sm9`.*
+*Documento generado a partir del análisis del código fuente. Última revisión: 2026-07-21 (rama `claude/session-ayxoss`). El plan de trabajo pendiente vive en [`ROADMAP.md`](./ROADMAP.md).*
