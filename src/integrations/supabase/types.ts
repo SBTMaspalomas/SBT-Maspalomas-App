@@ -441,6 +441,68 @@ export type Database = {
           },
         ];
       };
+      matches: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          is_home: boolean;
+          match_date: string;
+          match_number: string | null;
+          match_time: string | null;
+          notes: string | null;
+          opponent: string;
+          phase: string | null;
+          status: string;
+          team_id: string;
+          updated_at: string;
+          venue: string | null;
+          venue_address: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_home?: boolean;
+          match_date: string;
+          match_number?: string | null;
+          match_time?: string | null;
+          notes?: string | null;
+          opponent: string;
+          phase?: string | null;
+          status?: string;
+          team_id: string;
+          updated_at?: string;
+          venue?: string | null;
+          venue_address?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_home?: boolean;
+          match_date?: string;
+          match_number?: string | null;
+          match_time?: string | null;
+          notes?: string | null;
+          opponent?: string;
+          phase?: string | null;
+          status?: string;
+          team_id?: string;
+          updated_at?: string;
+          venue?: string | null;
+          venue_address?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "matches_team_id_fkey";
+            columns: ["team_id"];
+            isOneToOne: false;
+            referencedRelation: "teams";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       payments: {
         Row: {
           amount: number;

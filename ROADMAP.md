@@ -5,7 +5,7 @@
 > el estado real del código (`PRODUCT_SPEC.md` + revisión de `src/` y
 > `supabase/migrations/`).
 >
-> Fecha de revisión: **2026-07-21** · Rama de trabajo: `claude/plan-roadmap-phases-2-5-53sozm`
+> Fecha de revisión: **2026-07-21** · Rama de trabajo: `claude/fase-1-crear-partidos-oamzjo`
 
 ---
 
@@ -14,8 +14,9 @@
 De los **10 bloques** descritos en el plan de inicio, **8 están implementados y
 funcionales** contra Supabase (incluidos, tras las Fases 2-5, la Ficha Federativa
 PDF, la asistencia persistida y las convocatorias completas), **2 lo están
-parcialmente** (el Módulo 6 —calendario/GesDeportiva— no existe aún, y el Módulo 9
-tiene dorsales+tallas pero falta la tienda/consola de pedidos).
+parcialmente** (el Módulo 6 —calendario/GesDeportiva— ya tiene tabla `matches`,
+creación manual y visualización real, y solo le falta el importador de Excel; y el
+Módulo 9 tiene dorsales+tallas pero falta la tienda/consola de pedidos).
 Las **2 fases "en reserva"** (Galería y Estadísticas) siguen como *"Próximamente"*.
 
 | # | Módulo del plan | Estado | Falta principal |
@@ -25,7 +26,7 @@ Las **2 fases "en reserva"** (Galería y Estadísticas) siguen como *"Próximame
 | 3 | Flujo "Netflix" + FamilySelector + PIN + Código de referencia | ✅ Completo | — |
 | 4 | Admisión y Registro Federativo | ✅ Completo | — (Ficha Federativa PDF implementada; falta solo publicar el PDF oficial en blanco) |
 | 5 | Asistencia y Retrasos | ✅ Completo | — (persistida en Supabase, tabla `attendance`) |
-| 6 | **Calendario e Importación Exprés (GesDeportiva)** | ❌ **No existe** | Tabla `matches`, importación Excel con UPSERT por `match_number`, Casa/Fuera real |
+| 6 | **Calendario e Importación Exprés (GesDeportiva)** | 🟡 Parcial | Tabla `matches` + RLS ✅, creación manual + Casa/Fuera real + visualización a todos los roles ✅; **falta** la importación de Excel con UPSERT por `match_number` (botón deshabilitado) |
 | 7 | Comunicaciones y Canales | ✅ Completo | — (pulir cartelera/tablón) |
 | 8 | Financiero (3 cuotas) | ✅ Completo | — |
 | 9 | **Equipaciones y Logística de Ropa** | 🟡 Parcial | Dorsales blindados ✅ y packs de viaje/tallas ✅; **falta** tienda + consola de pedidos a fábrica |
@@ -43,18 +44,18 @@ Las **2 fases "en reserva"** (Galería y Estadísticas) siguen como *"Próximame
 
 ## 2. Detalle de lo que falta (por módulo)
 
-### 🏀 Módulo 6 — Calendario e Importación Exprés (GesDeportiva) — *no existe*
+### 🏀 Módulo 6 — Calendario e Importación Exprés (GesDeportiva) — *parcial (creación manual ✅)*
 
-El plan describe el corazón deportivo de la app y **hoy no hay nada real** detrás:
-`PlayerView` lee los partidos del *demo store* (`localStorage`) filtrando por
-nombre de equipo. No existe tabla `matches` en Supabase.
+Ya existe la **tabla `matches`** en Supabase (con RLS) y toda la app la lee de forma
+real: `PlayerView` (Jornada/Calendario), `MatchesManager`, `FamilyAgenda` y `Board`,
+con orden federativo Local–Visitante, indicador CASA/FUERA y botón a Google Maps del
+pabellón (hooks `useMatches` + helpers `lib/matches.ts`). El *demo store* ya no guarda
+partidos.
 
-Falta:
-- **Tabla `matches`** en Supabase con **`match_number` (nº oficial federativo) como clave** para el UPSERT.
-- **Importación del Excel semanal** del club: al arrastrar el fichero, *actualiza* horarios provisionales si el `match_number` ya existe o *inserta* los nuevos (fases nuevas de liga).
-- **Modelo flexible**: calendarios escalonados, múltiples fases de liga y campos de juego variables.
-- **Visualización "sagrada"**: orden federativo `Local – Visitante`, indicador **[🏠 CASA]** (color corporativo) / **[🚗 FUERA]** (fondo neutro).
-- **Nombre del pabellón como botón** que abre la ruta en Google Maps (la UI existe en demo; falta enlazarla a datos reales).
+- ✅ **Tabla `matches`** con **`match_number` (nº oficial federativo)** preparado como clave del UPSERT (índice único parcial), `is_home`, fase, fecha/hora, `team_id`, pabellón + dirección.
+- ✅ **Creación manual** de partidos por admin/coach (`MatchesManager`), con el equipo del coach limitado a sus `coach_teams`.
+- ✅ **Visualización "sagrada"**: orden federativo `Local – Visitante`, indicador **CASA** (color corporativo) / **FUERA**, y **pabellón como enlace a Google Maps**.
+- ⏳ **Importación del Excel semanal** del club (UPSERT por `match_number` para actualizar horarios provisionales o insertar nuevas fases): **pendiente**; el botón "Importar Excel" existe pero está **deshabilitado**.
 
 ### 👕 Módulo 9 — Equipaciones y Logística de Ropa — *parcial (dorsales + tallas ✅)*
 
@@ -112,12 +113,12 @@ Base sana antes de construir módulos nuevos.
 3. ✅ Convocatorias ya usan `useAuth` (`created_by = user.id`, `player_id` del
    perfil activo); no quedaban placeholders `current_user_id`/`current_player_id`.
 
-### Fase 1 — Calendario e Importación GesDeportiva (Módulo 6) · *alta prioridad* — ~5-7 días
+### Fase 1 — Calendario e Importación GesDeportiva (Módulo 6) · *alta prioridad* — 🟡 **Parcial** (creación manual ✅; importador pendiente)
 Es el núcleo deportivo del que dependen Convocatorias, Jornada y Cartelera.
-1. Tabla `matches` (con `match_number` único para el UPSERT, fase, campo, local/visitante, fecha/hora, `team_id`, venue) + RLS.
-2. Importador de Excel semanal (arrastrar y soltar) con lógica **UPSERT por `match_number`**.
-3. Conectar `PlayerView` (Jornada + Calendario) a la tabla real; indicador CASA/FUERA con color corporativo y botón a Google Maps del pabellón.
-4. Retirar `matches` del *demo store*.
+1. ✅ Tabla `matches` (con `match_number` único parcial preparado para el UPSERT, fase, `is_home`, fecha/hora, `team_id`, pabellón + dirección) + RLS + seed de partidos de ejemplo (migración `20260723100000_matches.sql`).
+2. ⏳ Importador de Excel semanal (arrastrar y soltar) con lógica **UPSERT por `match_number`** — **pendiente**; el botón "Importar Excel" existe en `MatchesManager` pero está **deshabilitado**.
+3. ✅ Creación manual de partidos (admin/coach en `MatchesManager`) y visualización real conectada a la tabla: `PlayerView` (Jornada + Calendario), `MatchesManager`, `FamilyAgenda` y `Board`, con orden federativo Local–Visitante, indicador CASA/FUERA y botón a Google Maps del pabellón (hooks `useMatches` + helpers `lib/matches.ts`).
+4. ✅ Retirado `matches` del *demo store* (`clubStore`): el tipo `Match` y el slice `matches` ya no existen; todo se lee de Supabase.
 
 ### Fase 2 — Convocatorias completas (Módulo 10) · *alta* — ✅ **Completada** (salvo vínculo a partido)
 1. ⏳ Vincular convocatoria de partido a un `match` — **pendiente**, depende de la Fase 1.

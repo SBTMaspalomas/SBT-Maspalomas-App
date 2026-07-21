@@ -61,16 +61,6 @@ export interface ChatMessage {
   at: number;
 }
 
-export interface Match {
-  id: string;
-  teamId: string;
-  date: string;
-  time: string;
-  opponent: string;
-  venue: "home" | "away";
-  address?: string;
-}
-
 export interface Announcement {
   id: string;
   title: string;
@@ -89,7 +79,6 @@ export interface ClubState {
   users: User[];
   teams: Team[];
   players: Player[];
-  matches: Match[];
   announcements: Announcement[];
   permDocs: PermDoc[];
   chats: ChatMessage[];
@@ -102,7 +91,6 @@ const emptyState = (): ClubState => ({
   users: [],
   teams: [],
   players: [],
-  matches: [],
   announcements: [],
   permDocs: [],
   chats: [],

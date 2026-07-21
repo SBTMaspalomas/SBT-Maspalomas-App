@@ -21,9 +21,11 @@ import { ConvocatoriesPlayer } from "@/components/club/ConvocatoriesPlayer";
 import { FederativaDoc } from "@/components/club/FederativaDoc";
 import { DorsalManager } from "@/components/club/DorsalManager";
 import { EquipmentSizes } from "@/components/club/EquipmentSizes";
+import { MatchesManager } from "@/components/club/MatchesManager";
+import { useMatches } from "@/hooks/use-matches";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash, CalendarDays,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -36,13 +38,14 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "dorsales" | "tallas";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "dorsales" | "tallas" | "partidos";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"] },
   // "Mi zona" pendiente de desarrollo — oculto hasta nueva orden.
   { id: "mizona", label: "Mi zona", icon: Trophy, roles: [] },
   { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent", "family", "senior", "staff"] },
+  { id: "partidos", label: "Partidos", icon: CalendarDays, roles: ["admin", "coach", "parent", "family", "senior", "staff"] },
   { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
   { id: "federativa", label: "Ficha federativa", icon: FileText, roles: ["family", "senior"] },
   { id: "miembros", label: "Miembros", icon: Users2, roles: ["admin"] },
@@ -264,6 +267,7 @@ function ClubApp() {
               {view === "inicio" && <Home setView={setView} effectiveRole={effectiveRole} />}
               {view === "mizona" && <PlayerView />}
               {view === "cartelera" && <NewsBoard />}
+              {view === "partidos" && <MatchesManager />}
               {view === "registro" && <RegistrationFlow />}
               {view === "miembros" && auth.role === "admin" && <RoleManager />}
               {view === "equipos" && auth.role === "admin" && <TeamsManager />}
@@ -292,7 +296,7 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
   const auth = useAuth();
   const user = useClub(currentUser);
   const players = useClub((s) => s.players);
-  const matches = useClub((s) => s.matches);
+  const { matches } = useMatches();
   const displayName = auth.fullName || auth.user?.email || user?.name || "Usuario";
   const role = effectiveRole;
   const stats = {
@@ -352,7 +356,7 @@ function Home({ setView, effectiveRole }: { setView: (v: View) => void; effectiv
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <QuickAction onClick={() => setView("cartelera")} title="Próximos partidos" desc={`${matches.length} programados`} />
+        <QuickAction onClick={() => setView("partidos")} title="Próximos partidos" desc={`${matches.length} programados`} />
         <QuickAction onClick={() => setView("chats")} title="Chats del club" desc="Equipo, padres y difusión" />
         {role === "admin" && <QuickAction onClick={() => setView("validacion")} title="Validar documentos" desc={`${stats.pending} pendientes`} />}
         {role === "coach" && <QuickAction onClick={() => setView("asistencia")} title="Control de asistencia" desc="Entreno y partido" />}

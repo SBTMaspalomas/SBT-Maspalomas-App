@@ -2,7 +2,7 @@
 
 > Documento técnico-funcional que describe **todo lo implementado** en la aplicación de gestión del club de baloncesto **SBT Maspalomas** ("El Baloncesto en el Sur · Gran Canaria").
 >
-> Última revisión del código: **2026-07-21** (rama `claude/plan-roadmap-phases-2-5-53sozm`). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade además las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo.
+> Última revisión del código: **2026-07-21** (rama `claude/fase-1-crear-partidos-oamzjo`). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo. Incorpora además la **Fase 1 · Calendario/Partidos** (Módulo 6): tabla `matches` con RLS, creación manual de partidos (admin/coach), importación de Excel deshabilitada, y visualización real de jornada/calendario para todos los roles.
 >
 > El plan de lo que **falta** por construir frente al plan de inicio del proyecto vive en un documento aparte, [`ROADMAP.md`](./ROADMAP.md).
 
@@ -143,6 +143,7 @@ Menú lateral filtrado según el rol efectivo (un perfil hijo se trata como `pla
 | Inicio | ✔ | ✔ | ✔ | ✔ | ✔ |
 | Mi zona (PlayerView) | | | | ✔ | |
 | Cartelera | ✔ | ✔ | ✔ | | ✔ |
+| Partidos (MatchesManager) | ✔ | ✔ | ✔ | | ✔ |
 | Registro federativo | ✔ | | ✔ | | ✔ |
 | Miembros (RoleManager) | ✔ | | | | |
 | Equipos (TeamsManager) | ✔ | | | | |
@@ -272,8 +273,8 @@ Panel del jugador (o del perfil hijo seleccionado vía prop `childId`). La cabec
 
 | Pestaña | Fuente de datos | Estado |
 |---------|-----------------|--------|
-| **Jornada** | *Demo store* `localStorage` (`useClub((s) => s.matches)`) | ⚠️ Datos demo |
-| **Calendario** | *Demo store* `localStorage` (mismos `matches`) | ⚠️ Datos demo |
+| **Jornada** | Supabase `matches` (vía `useMatches`, filtrado por el/los UUID de equipo) | ✅ Real |
+| **Calendario** | Supabase `matches` (mismos datos, lista completa ordenada) | ✅ Real |
 | **Clasificación** | Supabase `standings` (filtrado por el UUID del equipo) | ✅ Real |
 | **Eventos** | Supabase `club_events` (`order by event_date`) | ✅ Real |
 | **Tablón** | *Demo store* `announcements`, que `useClubData` **hidrata desde `club_events`** | ✅ Real (vía puente) |
@@ -281,7 +282,7 @@ Panel del jugador (o del perfil hijo seleccionado vía prop `childId`). La cabec
 
 Detalle de cada fuente:
 
-- **Jornada** y **Calendario** — leen el array `matches` del **store demo en `localStorage`** (`clubStore.ts`), **no** de Supabase. Ese array **arranca vacío** y hoy **ningún proceso lo hidrata** desde la base de datos (`useClubData` solo carga `teams`, `players` y `club_events`), por lo que en la práctica estas pestañas muestran *"No hay próxima jornada programada"* / *"Sin partidos en el calendario"* salvo que se inyecten partidos en el store local. Además el filtrado por equipo es una **heurística cableada** por nombre (`"mini a"`→`t1`, `"cadete"`→`t2`). *Jornada* toma el primer partido tras ordenar por fecha+hora, pinta la etiqueta **EN CASA/FUERA** (`match.venue`) y, si es `away` y hay `address`, un enlace a **Google Maps** (`https://www.google.com/maps/search/?api=1&query=<address>`). → Su sustitución por una tabla real `matches` es el **Módulo 6** del [`ROADMAP.md`](./ROADMAP.md).
+- **Jornada** y **Calendario** — leen la tabla real **`matches`** de Supabase mediante el hook `useMatches(teamUuids)` (§7.19), filtrando por los UUID de equipo del jugador (resueltos en `resolveTeams` cruzando `player_teams` y `teams.name` contra `players.team_id`). *Jornada* toma el primer partido tras ordenar por fecha+hora, muestra el enfrentamiento en **orden federativo Local – Visitante** (`localVisitante`), la etiqueta **EN CASA/FUERA** (`is_home`) y, si hay `venue_address`, un enlace al pabellón en **Google Maps** (helper `mapsUrl`). *Calendario* lista todos los partidos del equipo con la misma tarjeta. → Materializa el **Módulo 6 (Fase 1)** del [`ROADMAP.md`](./ROADMAP.md).
 - **Clasificación** — tabla `standings` de Supabase, filtrada por el **UUID del equipo** del jugador (se resuelve antes contra `teams`, ya que `players.team_id` puede almacenar un UUID o el nombre del equipo, evitando el error `22P02`). Columnas: posición, equipo rival, G, P, Pts.
 - **Eventos** — tabla `club_events` de Supabase (torneos, campus, etc.), ordenada por fecha.
 - **Tablón** — lee `announcements` del store demo, **pero** ese array **sí** está poblado: `useClubData` mapea cada fila de `club_events` a un anuncio (`title`/`description`/`event_date`). Es decir, *Eventos* y *Tablón* comparten origen real (`club_events`) por dos caminos distintos.
@@ -360,13 +361,23 @@ Formulario de tallas por jugador **condicional al nivel del equipo**:
 - Si el jugador solo juega liga local, se muestra **solo la equipación reversible**.
 - Las tallas se guardan (upsert por `player_id`) en la tabla `equipment_sizes`. La familia gestiona las de sus hijos/as; el jugador Senior las suyas (`selfPlayerId`). Admin/coach pueden leerlas (para la futura logística de pedidos del Módulo 9 completo).
 
+### 7.19 Partidos / Calendario — `MatchesManager.tsx` (admin/coach gestionan; resto lectura)
+
+Sección **"Partidos"** del menú, núcleo del **Módulo 6 (Fase 1)**. Es un componente único que se comporta según el rol (`canManage = admin | coach`):
+
+- **Creación manual** (solo admin/coach): un `Dialog` con formulario (`useState` + validación manual + `toast`, mismo patrón que `ConvocatoriesManager`) que inserta en la tabla `matches`: equipo (del club), rival, condición **CASA/FUERA** (`is_home`), fecha, hora, pabellón, dirección del pabellón, fase de liga, nº de acta federativo y notas. El equipo del coach se limita a sus `coach_teams`.
+- **Importación de fichero (Excel semanal)**: botón **presente pero deshabilitado** ("Próximamente"), reservando el sitio para el futuro UPSERT por `match_number`.
+- **Visualización** (todos los roles): listado de partidos ordenado por fecha/hora, con el enfrentamiento en **orden federativo Local – Visitante** (`localVisitante`), badge **CASA** (color corporativo) / **FUERA**, fecha/hora, fase, y el **pabellón como enlace a Google Maps** (`mapsUrl`) cuando hay dirección. El coach solo ve los partidos de sus equipos; admin y roles de lectura ven todo el club.
+
+Los datos se leen con el hook **`useMatches(teamIds?)`** (`src/hooks/use-matches.ts`) y se formatean con los helpers puros de **`src/lib/matches.ts`** (`sortMatches`, `localVisitante`, `mapsUrl`), reutilizados también por `PlayerView` (§7.9), `FamilyAgenda` (`FamilySelector`) y `Board`.
+
 ---
 
 ## 8. Capa de datos (Supabase)
 
 ### 8.1 Store de demo (`clubStore.ts` + `use-club-data.tsx`)
 
-Existe un store cliente en `localStorage` (`club_state_v1`) con tipos heredados (`Team`, `Player`, `Match`, `Announcement`, etc.). El hook `useClubData` hidrata parcialmente este store desde Supabase (`teams`, `players`, `club_events`) y se suscribe a cambios en tiempo real. Sirve de **puente de compatibilidad** para las vistas heredadas (PlayerView, Board, FamilyAgenda) mientras la migración a Supabase se completa.
+Existe un store cliente en memoria con tipos heredados (`Team`, `Player`, `Announcement`, etc.). El hook `useClubData` hidrata parcialmente este store desde Supabase (`teams`, `players`, `club_events`) y se suscribe a cambios en tiempo real. Sirve de **puente de compatibilidad** para las vistas heredadas mientras la migración a Supabase se completa. Los **partidos ya no viven en este store**: se retiró el tipo `Match` y el slice `matches` en la Fase 1, y todas las vistas leen la tabla real `matches` vía el hook `useMatches` (§7.19).
 
 ### 8.2 Esquema PostgreSQL (migraciones `supabase/migrations/`)
 
@@ -383,6 +394,7 @@ Tablas con **Row Level Security (RLS)** activada:
 | `families_meta` | Ficha de familia (head, email, `reference_code`, `adult_pin`) | Familia lee/gestiona la suya; admin todo |
 | `standings` | Clasificación por equipo | Lectura autenticados; admin gestiona |
 | `club_events` | Eventos del club (torneos, campus…) | Lectura autenticados; admin gestiona |
+| `matches` | Partidos/calendario (rival, `is_home`, fecha/hora, pabellón+dirección, fase, `match_number` único, estado) | Admin/coach gestionan (`created_by = auth.uid()`); autenticados leen |
 | `team_messages` | Mensajes de canales team/family/broadcast/admins/coaches/staff | Controlado por `user_can_access_team_channel` + `chat_channel_open`; admin puede borrar |
 | `chat_channels` | Config/estado de cada canal (`channel_key`, `kind`, `enabled`, `status`) | Lectura autenticados; gestión solo admin |
 | `private_messages` | Mensajes privados admin↔familia | Solo admin y familia receptora; admin puede borrar |
@@ -395,7 +407,7 @@ Tablas con **Row Level Security (RLS)** activada:
 | `attendance` | Asistencia por jugador/equipo/día (`status`, `absent_reason`) | Admin/coach gestionan (`recorded_by = auth.uid()`); jugador/familia leen lo suyo |
 | `equipment_sizes` | Tallas de equipación por jugador | Familia/senior gestionan lo suyo; admin/coach leen |
 
-Estas tablas están **versionadas en `supabase/migrations/`** desde el saneamiento de la **Fase 0** (migraciones `20260721090000`–`20260721090300`) y las **Fases 2-5** (migraciones `20260722100000`–`20260722100300`), y **tipadas en `src/integrations/supabase/types.ts`** sin accesos `as any`.
+Estas tablas están **versionadas en `supabase/migrations/`** desde el saneamiento de la **Fase 0** (migraciones `20260721090000`–`20260721090300`), las **Fases 2-5** (migraciones `20260722100000`–`20260722100300`) y la **Fase 1 · Calendario/Partidos** (migración `20260723100000_matches.sql`, que además siembra unos partidos de ejemplo), y **tipadas en `src/integrations/supabase/types.ts`** sin accesos `as any`.
 
 **Funciones y triggers relevantes**:
 - `handle_new_user()` — crea `profiles` + rol por defecto (`family`, o `admin` para emails bootstrap) y auto-vincula familias por email.

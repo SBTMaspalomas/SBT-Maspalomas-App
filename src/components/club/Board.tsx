@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { clubStore, useClub, currentUser } from "@/lib/clubStore";
+import { useMatches } from "@/hooks/use-matches";
+import { localVisitante, mapsUrl } from "@/lib/matches";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -9,15 +11,13 @@ import { MapPin, Download, Plus, FileText, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 export function Board() {
-  const matches = useClub((s) => s.matches);
+  const { matches: sortedMatches } = useMatches();
   const teams = useClub((s) => s.teams);
   const permDocs = useClub((s) => s.permDocs);
   const announcements = useClub((s) => s.announcements);
   const user = useClub(currentUser);
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
-
-  const sortedMatches = [...matches].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   const post = () => {
     if (!newTitle.trim()) return;
@@ -41,28 +41,29 @@ export function Board() {
 
           <TabsContent value="jornada" className="mt-4 space-y-2">
             {sortedMatches.map((m) => {
-              const team = teams.find((t) => t.id === m.teamId);
+              const team = teams.find((t) => t.id === m.team_id);
+              const { local, visitante } = localVisitante(m, team?.name ?? "Nuestro equipo");
               return (
                 <div key={m.id} className="rounded-lg border border-border bg-surface p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-xs uppercase tracking-wide text-primary">{team?.name}</div>
-                      <div className="truncate font-semibold">{team?.name} <span className="text-muted-foreground">vs</span> {m.opponent}</div>
+                      <div className="truncate font-semibold">{local} <span className="text-muted-foreground">vs</span> {visitante}</div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" /> {new Date(m.date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "short" })} · {m.time}
+                        <Clock className="h-3 w-3" /> {new Date(m.match_date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "short" })}{m.match_time ? ` · ${m.match_time}` : ""}
                       </div>
                     </div>
                     <div className="shrink-0">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.venue === "home" ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>
-                        {m.venue === "home" ? "CASA" : "FUERA"}
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.is_home ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>
+                        {m.is_home ? "CASA" : "FUERA"}
                       </span>
                     </div>
                   </div>
-                  {m.venue === "away" && m.address && (
+                  {m.venue_address && (
                     <a className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(m.address)}`}
+                      href={mapsUrl(m.venue_address)}
                       target="_blank" rel="noreferrer">
-                      <MapPin className="h-3 w-3" /> {m.address} · abrir en Maps
+                      <MapPin className="h-3 w-3" /> {m.venue ?? m.venue_address} · abrir en Maps
                     </a>
                   )}
                 </div>
@@ -88,7 +89,7 @@ export function Board() {
           </TabsContent>
 
           <TabsContent value="tablon" className="mt-4 space-y-3">
-            {(user.role === "admin" || user.role === "coach") && (
+            {(user?.role === "admin" || user?.role === "coach") && (
               <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
                 <div className="text-sm font-semibold">Publicar anuncio</div>
                 <Input placeholder="Título (ej: Entrenamiento suspendido)" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
