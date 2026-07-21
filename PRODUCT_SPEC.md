@@ -2,7 +2,7 @@
 
 > Documento técnico-funcional que describe **todo lo implementado** en la aplicación de gestión del club de baloncesto **SBT Maspalomas** ("El Baloncesto en el Sur · Gran Canaria").
 >
-> Última revisión del código: **2026-07-21** (rama `claude/session-ayxoss`). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`) y las cuotas editables.
+> Última revisión del código: **2026-07-21**. Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0** (versionado en migraciones de `registrations`, `payments`, `convocatorias` y `convocatoria_responses`, con retirada de los accesos `as any`).
 >
 > El plan de lo que **falta** por construir frente al plan de inicio del proyecto vive en un documento aparte, [`ROADMAP.md`](./ROADMAP.md).
 
@@ -254,7 +254,7 @@ Panel de administración de usuarios registrados:
 
 **Player**: lista de convocatorias con opción de **confirmar asistencia** o **reportar un problema** (llegaré tarde / no puedo asistir / lesión / otro, con notas). Las respuestas se guardan en `convocatoria_responses`.
 
-> ⚠️ *Nota técnica*: en estos componentes los identificadores `created_by` y `player_id` están cableados como placeholders (`"current_user_id"` / `"current_player_id"`) pendientes de integrar con el contexto de auth.
+Los identificadores se integran con el contexto de auth: `convocatorias.created_by` toma `user.id` del `useAuth`, y `convocatoria_responses.player_id` el jugador del perfil activo (el `childId` del perfil hijo o el `selfPlayerId` del jugador Senior).
 
 ### 7.8 Control de asistencia — `Attendance.tsx` (solo coach)
 
@@ -361,13 +361,13 @@ Tablas con **Row Level Security (RLS)** activada:
 | `team_messages` | Mensajes de canales team/family/broadcast/admins/coaches/staff | Controlado por `user_can_access_team_channel` + `chat_channel_open`; admin puede borrar |
 | `chat_channels` | Config/estado de cada canal (`channel_key`, `kind`, `enabled`, `status`) | Lectura autenticados; gestión solo admin |
 | `private_messages` | Mensajes privados admin↔familia | Solo admin y familia receptora; admin puede borrar |
-| `registrations`* | Registros federativos (adulto/menor, docs, autorizaciones, estados por documento) | Usado por RegistrationFlow y ValidationConsole |
-| `payments`* | Cuotas y pagos (importe, periodo, estado, comprobante) | Admin gestiona; familia ve los suyos |
+| `registrations` | Registros federativos (adulto/menor, docs, autorizaciones, estados por documento) | Admin gestiona todo; cada usuario ve/inserta los suyos (`user_id = auth.uid()`) |
+| `payments` | Cuotas y pagos (importe, periodo, estado, comprobante) | Admin gestiona; familia/jugador ven y actualizan los suyos (por `family_id` o `players.user_id`) |
 | `fee_schedules` | Importes y fechas límite de cada tipo de cuota (senior/federado/escuela) | Admin edita; todos leen |
-| `convocatorias`* | Convocatorias de entreno/partido | Manager/Player |
-| `convocatoria_responses`* | Respuestas de jugadores a convocatorias | Manager/Player |
+| `convocatorias` | Convocatorias de entreno/partido | Admin/coach gestionan; autenticados leen |
+| `convocatoria_responses` | Respuestas de jugadores a convocatorias | Admin/coach todo; jugador/familia gestionan la suya |
 
-\* Tablas referenciadas en el código y **presentes ya en los tipos generados** (`src/integrations/supabase/types.ts`), pero cuya migración `CREATE TABLE` **no está versionada** en `supabase/migrations/` (viven en la BD de Lovable y parcialmente en `supabase/manual/`) — ver §8.5 y §10.
+Todas estas tablas están **versionadas en `supabase/migrations/`** desde el saneamiento de la **Fase 0** (migraciones `20260721090000`–`20260721090300`) y **tipadas en `src/integrations/supabase/types.ts`** sin accesos `as any`.
 
 **Funciones y triggers relevantes**:
 - `handle_new_user()` — crea `profiles` + rol por defecto (`family`, o `admin` para emails bootstrap) y auto-vincula familias por email.
@@ -388,9 +388,16 @@ Tablas con **Row Level Security (RLS)** activada:
 
 Publicación `supabase_realtime` incluye `team_messages` y `private_messages`. `useClubData` también se suscribe a cambios de esquema para refrescar el store demo.
 
-### 8.5 SQL manual (`supabase/manual/`)
+### 8.5 Saneamiento de migraciones (Fase 0)
 
-Además de las migraciones automáticas, el repo incluye la carpeta `supabase/manual/` con SQL **aditivo e idempotente que se aplica a mano** en el editor de Supabase/Lovable (no forma parte del pipeline de migraciones). El fichero `2026-07-19_registro_paneles_fixes.sql` reúne los cambios de la tanda de registro/paneles: valores de enum `senior`/`staff`, `CHECK` ampliado de `user_roles`, columnas `players.avatar_url` y `players.user_id` (con sus políticas RLS para que el Senior gestione su ficha y la familia edite a sus hijos) y demás ajustes. Debe ejecutarse por bloques (los `ALTER TYPE … ADD VALUE` van en su propia transacción).
+El repo tuvo temporalmente una carpeta `supabase/manual/` con SQL **aditivo e idempotente que se aplicaba a mano** en el editor de Supabase/Lovable, para objetos creados fuera del pipeline de migraciones. En el **saneamiento de la Fase 0** ese SQL se **promovió a `supabase/migrations/`** y la carpeta manual se retiró:
+
+- `20260721090000_players_columns_player_teams_storage.sql` — columnas `players.avatar_url` y `players.user_id` (+ RLS de Senior/familia), tabla puente `player_teams` (+ RLS) y bucket de Storage `player-docs` (+ políticas por carpeta de usuario).
+- `20260721090100_registrations.sql` — tabla `registrations` (incluidas las columnas del semáforo por documento) + RLS.
+- `20260721090200_payments.sql` — tabla `payments` + RLS.
+- `20260721090300_convocatorias_and_registration_role.sql` — `convocatorias`, `convocatoria_responses` (+ RLS) y la RPC `set_self_registration_role`.
+
+Los valores de enum `senior`/`staff` y el `CHECK` ampliado de `user_roles` ya se habían versionado antes (`20260720100000`, `20260720100001`). Todas las migraciones son idempotentes (`CREATE … IF NOT EXISTS`, `DROP POLICY IF EXISTS` + `CREATE`), por lo que pueden reejecutarse sin romper la BD viva. Asumen la existencia previa del enum `app_role` y del helper `has_role()`, creados fuera de migraciones como el resto del esquema base.
 
 ---
 
@@ -412,14 +419,17 @@ Además de las migraciones automáticas, el repo incluye la carpeta `supabase/ma
 
 **Implementado y funcional** (contra Supabase): autenticación, registro federativo con tipos de usuario (responsable/senior/coach/staff), validación documental, gestión de equipos, asignación de jugadores (multi-equipo), gestión de miembros/roles, pagos con cuotas editables (admin y familia), chats en tiempo real (team/family/broadcast/privado + canales de rol) y su gestión por el admin, selector de familia con PIN, avatares.
 
-**Puntos de atención / deuda técnica**:
-1. **Migraciones no versionadas**: `registrations`, `payments`, `convocatorias`, `convocatoria_responses`, `player_teams` y `chat_channels` **ya figuran en `types.ts`**, pero la migración `CREATE TABLE` de varias de ellas no está en `supabase/migrations/` (vive en la BD de Lovable / `supabase/manual/`). Conviene versionar esas migraciones para reproducir el esquema desde cero.
-2. **Convocatorias con placeholders**: `created_by` y `player_id` están cableados (`"current_user_id"`, `"current_player_id"`) — falta integrarlos con `useAuth`.
-3. **Asistencia en localStorage**: `Attendance.tsx` no persiste en base de datos todavía.
-4. **Partidos en datos demo**: la **Jornada** y el **Calendario** de `PlayerView` leen `matches` del *demo store* (`localStorage`), array que hoy arranca vacío y **no se hidrata** desde Supabase. Es el núcleo del **Módulo 6 (Calendario/GesDeportiva)** pendiente — ver [`ROADMAP.md`](./ROADMAP.md).
-5. **Secciones "Próximamente"**: Galería y Stats en `PlayerView`, y `NewsBoard` (tablón general).
-6. **Componentes no enlazados**: `Board.tsx` y `PlayersList.tsx` existen como base pero no están en la navegación actual.
-7. El botón *"Reiniciar datos demo"* en la cabecera resetea el store local (utilidad de desarrollo).
+**Saldado en la Fase 0** (saneamiento previo):
+- ✅ **Migraciones versionadas**: `registrations`, `payments`, `convocatorias`, `convocatoria_responses` (y los objetos que vivían en `supabase/manual/`: columnas de `players`, `player_teams`, bucket `player-docs`, RPC de rol) ya están en `supabase/migrations/` — ver §8.5. `chat_channels` ya estaba versionada.
+- ✅ **Tipos sin `as any`**: `types.ts` completado (columnas del semáforo por documento de `registrations`) y retirados los accesos `as any` sobre estas tablas. Queda un único `as any` residual sobre `players.id_card_number`, columna heredada inexistente en el esquema real (lectura legada tolerada en `use-club-data`).
+- ✅ **Convocatorias con `useAuth`**: `created_by` = `user.id` y `player_id` = jugador del perfil activo; ya no hay placeholders `current_user_id`/`current_player_id`.
+
+**Puntos de atención / deuda técnica pendiente**:
+1. **Asistencia en localStorage**: `Attendance.tsx` no persiste en base de datos todavía.
+2. **Partidos en datos demo**: la **Jornada** y el **Calendario** de `PlayerView` leen `matches` del *demo store* (`localStorage`), array que hoy arranca vacío y **no se hidrata** desde Supabase. Es el núcleo del **Módulo 6 (Calendario/GesDeportiva)** pendiente — ver [`ROADMAP.md`](./ROADMAP.md).
+3. **Secciones "Próximamente"**: Galería y Stats en `PlayerView`, y `NewsBoard` (tablón general).
+4. **Componentes no enlazados**: `Board.tsx` y `PlayersList.tsx` existen como base pero no están en la navegación actual.
+5. El botón *"Reiniciar datos demo"* en la cabecera resetea el store local (utilidad de desarrollo).
 
 > El plan priorizado de lo que falta (Calendario/GesDeportiva, Equipaciones, Ficha Federativa PDF, Convocatorias completas, Asistencia en Supabase, etc.) se mantiene en [`ROADMAP.md`](./ROADMAP.md).
 
@@ -488,7 +498,6 @@ src/
 └── server.ts, start.ts, router.tsx
 
 supabase/migrations/           # Esquema, RLS, triggers, funciones, seeds
-supabase/manual/               # SQL aditivo para aplicar a mano (§8.5)
 ```
 
 ---
