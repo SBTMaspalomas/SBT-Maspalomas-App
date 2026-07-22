@@ -6,7 +6,9 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  // supabase/functions contiene Edge Functions de Deno (globals y runtime propios);
+  // se lintan con Deno, no con este ESLint orientado al navegador.
+  { ignores: ["dist", ".output", ".vinxi", "supabase/functions"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

@@ -724,6 +724,7 @@ export type Database = {
           id: string;
           phone: string | null;
           updated_at: string;
+          username: string | null;
         };
         Insert: {
           avatar_url?: string | null;
@@ -733,6 +734,7 @@ export type Database = {
           id: string;
           phone?: string | null;
           updated_at?: string;
+          username?: string | null;
         };
         Update: {
           avatar_url?: string | null;
@@ -742,6 +744,46 @@ export type Database = {
           id?: string;
           phone?: string | null;
           updated_at?: string;
+          username?: string | null;
+        };
+        Relationships: [];
+      };
+      provisioned_credentials: {
+        Row: {
+          child_name: string | null;
+          created_at: string;
+          created_by: string | null;
+          family_id: string | null;
+          id: string;
+          player_id: string | null;
+          temp_password: string | null;
+          used: boolean;
+          user_id: string | null;
+          username: string;
+        };
+        Insert: {
+          child_name?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          family_id?: string | null;
+          id?: string;
+          player_id?: string | null;
+          temp_password?: string | null;
+          used?: boolean;
+          user_id?: string | null;
+          username: string;
+        };
+        Update: {
+          child_name?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          family_id?: string | null;
+          id?: string;
+          player_id?: string | null;
+          temp_password?: string | null;
+          used?: boolean;
+          user_id?: string | null;
+          username?: string;
         };
         Relationships: [];
       };
@@ -902,6 +944,10 @@ export type Database = {
       };
       set_player_dorsal: {
         Args: { _player_id: string; _team_id: string; _dorsal: number };
+        Returns: undefined;
+      };
+      clear_my_provisioned_password: {
+        Args: Record<PropertyKey, never>;
         Returns: undefined;
       };
     };

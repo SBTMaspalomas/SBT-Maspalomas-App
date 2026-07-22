@@ -31,6 +31,9 @@ interface AuthCtx {
   family: FamilyInfo | null;
   activeProfile: ActiveProfile | null;
   selfPlayerId: string | null;
+  // true para cuentas provisionadas por el club que aún no han cambiado su
+  // contraseña temporal (flag en user_metadata.must_change_password).
+  mustChangePassword: boolean;
   selectAdult: (pin: string) => boolean;
   selectChild: (childId: string) => void;
   clearProfile: () => void;
@@ -39,7 +42,7 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx>({
   session: null, user: null, role: null, roles: [], fullName: null, loading: true,
-  family: null, activeProfile: null, selfPlayerId: null,
+  family: null, activeProfile: null, selfPlayerId: null, mustChangePassword: false,
   selectAdult: () => false, selectChild: () => {}, clearProfile: () => {},
   signOut: async () => {},
 });
@@ -125,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [family, setFamily] = useState<FamilyInfo | null>(null);
   const [activeProfile, setActiveProfile] = useState<ActiveProfile | null>(null);
   const [selfPlayerId, setSelfPlayerId] = useState<string | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -136,6 +140,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const apply = async (s: Session | null) => {
       setSession(s);
+      // Se recalcula SIEMPRE (antes del dedup por loadedUserId) porque tras el
+      // cambio de contraseña llega un USER_UPDATED con el mismo usuario y hay que
+      // reflejar que el flag ya está limpio.
+      setMustChangePassword(s?.user?.user_metadata?.must_change_password === true);
       if (!s?.user) {
         loadedUserId = null;
         setRole(null); setRoles([]); setFullName(null); setFamily(null);
@@ -221,7 +229,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       session, user: session?.user ?? null, role, roles, fullName, loading,
-      family, activeProfile, selfPlayerId, selectAdult, selectChild, clearProfile, signOut,
+      family, activeProfile, selfPlayerId, mustChangePassword,
+      selectAdult, selectChild, clearProfile, signOut,
     }}>
       {children}
     </Ctx.Provider>

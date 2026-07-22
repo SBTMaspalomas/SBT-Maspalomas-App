@@ -361,6 +361,11 @@ function CsvStructureHelp({ teams }: { teams: TeamRow[] }) {
       <Button variant="outline" size="sm" onClick={downloadTemplate}>
         <Download className="mr-2 h-4 w-4" /> Descargar plantilla CSV
       </Button>
+      <p className="text-xs text-muted-foreground">
+        Tras importar los jugadores, ve a <span className="font-semibold text-foreground">Cuentas de
+        familias</span> para generar en bloque los usuarios y contraseñas temporales de sus
+        padres/tutores.
+      </p>
     </div>
   );
 }

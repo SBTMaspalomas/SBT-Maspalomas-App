@@ -1,1 +1,6 @@
 project_id = "yudkyfqlcsvybzlbhwyn"
+
+# Provisión de cuentas de familias por el admin. verify_jwt rechaza llamadas
+# anónimas en el gateway; la función además comprueba el rol admin del llamante.
+[functions.admin-provision-parents]
+verify_jwt = true
