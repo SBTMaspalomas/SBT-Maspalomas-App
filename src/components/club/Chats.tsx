@@ -30,7 +30,14 @@ interface PrivateMsg { id: string; sender_id: string; receiver_family_id: string
 
 const isU12 = (t?: TeamRow) => (t?.age_category ?? "U14+") === "U12";
 
-export function Chats() {
+interface ChatsProps {
+  /** Familia cuyo chat privado debe abrirse al montar (lo dispara el admin desde Miembros). */
+  initialPrivateFamilyId?: string | null;
+  /** Se llama cuando el chat privado solicitado ya se ha seleccionado. */
+  onConsumedPrivateChat?: () => void;
+}
+
+export function Chats({ initialPrivateFamilyId, onConsumedPrivateChat }: ChatsProps = {}) {
   const { user, role, roles, fullName, family, activeProfile } = useAuth();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
@@ -186,6 +193,17 @@ export function Chats() {
     if (channels.length && !channels.find((c) => c.id === active)) setActive(channels[0].id);
     if (!channels.length) setActive("");
   }, [channels, active]);
+
+  // El admin abre un chat privado concreto desde Miembros: cuando la lista de
+  // canales ya incluye el privado de esa familia, seleccionarlo directamente.
+  useEffect(() => {
+    if (!initialPrivateFamilyId) return;
+    const match = channels.find((c) => c.id === `private-${initialPrivateFamilyId}`);
+    if (match) {
+      setActive(match.id);
+      onConsumedPrivateChat?.();
+    }
+  }, [initialPrivateFamilyId, channels, onConsumedPrivateChat]);
 
   // Listen for admin "open private chat" event
   useEffect(() => {

@@ -74,6 +74,7 @@ function ClubApp() {
   const user = useClub(currentUser);
   const { logoUrl } = useLogoUrl();
   const [view, setView] = useState<View>("inicio");
+  const [pendingPrivateFamilyId, setPendingPrivateFamilyId] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState<boolean | null>(null);
 
@@ -97,7 +98,11 @@ function ClubApp() {
   }, [auth.user, auth.role]);
 
   useEffect(() => {
-    const onOpen = () => setView("chats");
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<{ familyId?: string }>).detail;
+      setPendingPrivateFamilyId(detail?.familyId ?? null);
+      setView("chats");
+    };
     window.addEventListener("open-private-chat", onOpen as EventListener);
     return () => window.removeEventListener("open-private-chat", onOpen as EventListener);
   }, []);
@@ -280,7 +285,12 @@ function ClubApp() {
             <>
               {(view === "inicio" || view === "mizona") && <PlayerView childId={childId} />}
               {view === "mis-convocatorias" && <ConvocatoriesPlayer playerId={childId} />}
-              {view === "chats" && <Chats />}
+              {view === "chats" && (
+                <Chats
+                  initialPrivateFamilyId={pendingPrivateFamilyId}
+                  onConsumedPrivateChat={() => setPendingPrivateFamilyId(null)}
+                />
+              )}
               {view === "cartelera" && <NewsBoard />}
             </>
           ) : (
@@ -306,7 +316,12 @@ function ClubApp() {
               {view === "pagos" && (auth.role === "parent" || auth.role === "family") && <PaymentsParent />}
               {view === "pagos" && auth.role === "senior" && <PaymentsParent playerId={auth.selfPlayerId ?? undefined} />}
               {view === "asistencia" && auth.role === "coach" && <Attendance />}
-              {view === "chats" && <Chats />}
+              {view === "chats" && (
+                <Chats
+                  initialPrivateFamilyId={pendingPrivateFamilyId}
+                  onConsumedPrivateChat={() => setPendingPrivateFamilyId(null)}
+                />
+              )}
               {view === "ajustes" && auth.role === "admin" && <LogoSettings />}
             </>
           )}
