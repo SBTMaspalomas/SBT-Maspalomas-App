@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSignedPlayerDoc } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -386,6 +387,8 @@ function DocUploader({
   onSelect: (file: File) => void;
   preview?: boolean;
 }) {
+  // El bucket es privado: firma la URL guardada para poder mostrar/descargar.
+  const signedUrl = useSignedPlayerDoc(currentUrl);
   return (
     <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
       <div className="flex items-center gap-2">
@@ -394,17 +397,17 @@ function DocUploader({
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
 
-      {currentUrl && (
+      {currentUrl && signedUrl && (
         <div className="flex items-center gap-3">
           {preview && (
             <img
-              src={currentUrl}
+              src={signedUrl}
               alt={title}
               className="h-14 w-14 rounded-md border border-border object-cover"
             />
           )}
           <a
-            href={currentUrl}
+            href={signedUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-primary hover:underline"

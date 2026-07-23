@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSignedPlayerDocs } from "@/lib/storage";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,10 @@ export function ValidationConsole() {
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
 
   const selected = registrations.find((r) => r.id === openId);
+  // Bucket privado: firma los documentos del registro abierto para previsualizar/descargar.
+  const signedDocs = useSignedPlayerDocs(
+    selected ? DOC_FIELDS.map((f) => selected[DOC_URL_MAP[f]] as string | null) : [],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -272,6 +277,7 @@ export function ValidationConsole() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {DOC_FIELDS.map((field) => {
                     const url = selected[DOC_URL_MAP[field]] as string | null;
+                    const signedUrl = url ? signedDocs.get(url) : undefined;
                     const status = (selected[field] || "pending") as DocStatus;
                     const S = statusUI[status] || defaultStatus;
                     const SIcon = S.icon;
@@ -285,17 +291,19 @@ export function ValidationConsole() {
                           <Badge variant="outline" className={`text-[10px] ${S.cls}`}><SIcon className="mr-1 h-2.5 w-2.5" />{S.label}</Badge>
                         </div>
                         {url ? (
-                          isPdf ? (
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded bg-muted text-muted-foreground transition hover:text-foreground">
+                          !signedUrl ? (
+                            <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted text-muted-foreground text-xs">Preparando…</div>
+                          ) : isPdf ? (
+                            <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded bg-muted text-muted-foreground transition hover:text-foreground">
                               <FileText className="h-8 w-8" />
                               <span className="inline-flex items-center gap-1 text-xs"><Download className="h-3 w-3" /> Abrir PDF</span>
                             </a>
                           ) : (
                             <div className="relative group">
                               <div className="flex aspect-[4/3] items-center justify-center rounded bg-muted overflow-hidden">
-                                <img src={url} alt={DOC_LABELS[field]} className="w-full h-full object-cover rounded" />
+                                <img src={signedUrl} alt={DOC_LABELS[field]} className="w-full h-full object-cover rounded" />
                               </div>
-                              <a href={url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition rounded">
+                              <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition rounded">
                                 <Download className="h-4 w-4 text-white" />
                               </a>
                             </div>

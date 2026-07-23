@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSignedPlayerDocs } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,12 @@ export function FederativaDoc() {
     load();
   }, [load]);
 
+  // URLs firmadas de corta duración para descargar las fichas (bucket privado).
+  const signedDocs = useSignedPlayerDocs([
+    ...fichas.map((f) => f.federativa_pdf_url),
+    ...registrations.map((r) => r.federativa_pdf_url),
+  ]);
+
   const handleUpload = async (regId: string, file: File) => {
     if (!user) return;
     if (file.type !== "application/pdf") {
@@ -148,14 +155,20 @@ export function FederativaDoc() {
                     <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="truncate text-sm font-medium">{f.full_name}</span>
                   </div>
-                  {f.federativa_pdf_url ? (
-                    <a href={f.federativa_pdf_url} target="_blank" rel="noopener noreferrer">
+                  {f.federativa_pdf_url && signedDocs.get(f.federativa_pdf_url) ? (
+                    <a
+                      href={signedDocs.get(f.federativa_pdf_url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <Button variant="outline" size="sm">
                         <Download className="mr-2 h-4 w-4" /> Descargar ficha
                       </Button>
                     </a>
                   ) : (
-                    <span className="text-xs text-muted-foreground">Aún no disponible</span>
+                    <span className="text-xs text-muted-foreground">
+                      {f.federativa_pdf_url ? "Preparando…" : "Aún no disponible"}
+                    </span>
                   )}
                 </div>
               ))}
@@ -189,9 +202,9 @@ export function FederativaDoc() {
                         {reg.type === "adult" ? "Adulto" : "Menor"}
                       </Badge>
                     </div>
-                    {reg.federativa_pdf_url && (
+                    {reg.federativa_pdf_url && signedDocs.get(reg.federativa_pdf_url) && (
                       <a
-                        href={reg.federativa_pdf_url}
+                        href={signedDocs.get(reg.federativa_pdf_url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"

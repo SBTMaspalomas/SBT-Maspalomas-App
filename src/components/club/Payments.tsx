@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSignedPlayerDocs } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,8 @@ export function PaymentsAdmin() {
   const [loading, setLoading] = useState(true);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  // Bucket privado: URLs firmadas para ver los comprobantes.
+  const signedReceipts = useSignedPlayerDocs(payments.map((p) => p.receipt_url));
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -201,11 +204,11 @@ export function PaymentsAdmin() {
                 </div>
               </div>
 
-              {selectedPayment.receipt_url && (
+              {selectedPayment.receipt_url && signedReceipts.get(selectedPayment.receipt_url) && (
                 <div className="border border-border rounded p-3">
                   <div className="text-sm font-medium mb-2">Comprobante</div>
                   <a
-                    href={selectedPayment.receipt_url}
+                    href={signedReceipts.get(selectedPayment.receipt_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm text-primary hover:underline"
@@ -256,6 +259,8 @@ export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
+  // Bucket privado: URLs firmadas para ver los comprobantes.
+  const signedReceipts = useSignedPlayerDocs(payments.map((p) => p.receipt_url));
 
   // Determinar las cuotas aplicables según los equipos principales de los hijos/as
   // (familia) o del propio jugador SENIOR (playerId). A un adulto sin jugadores con
@@ -453,10 +458,10 @@ export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
                   )}
 
                   {/* View Receipt */}
-                  {payment.receipt_url && (
+                  {payment.receipt_url && signedReceipts.get(payment.receipt_url) && (
                     <div className="mt-2">
                       <a
-                        href={payment.receipt_url}
+                        href={signedReceipts.get(payment.receipt_url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-center gap-2 px-3 py-2 rounded bg-background hover:bg-muted transition text-xs"
