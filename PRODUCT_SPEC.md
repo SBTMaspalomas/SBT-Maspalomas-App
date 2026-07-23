@@ -2,7 +2,7 @@
 
 > Documento técnico-funcional que describe **todo lo implementado** en la aplicación de gestión del club de baloncesto **SBT Maspalomas** ("El Baloncesto en el Sur · Gran Canaria").
 >
-> Última revisión del código: **2026-07-23** (rama `claude/user-manual-comprehensive-wsuvrt`). Incorpora el **acceso por nombre de usuario** además de por email (cuentas provisionadas por el club con email sintético `@sbtmaspalomas.local`; `src/lib/username.ts`, §5.4), la **provisión masiva de cuentas de familias** por el administrador (pantalla «Cuentas de familias»: genera usuario + contraseña temporal por jugador vía la Edge Function `admin-provision-parents`, las guarda en `provisioned_credentials` y permite copiarlas/exportarlas; `FamilyProvisioning.tsx`, §7.20), el **cambio de contraseña obligatorio en el primer acceso** de esas cuentas (`/set-password`, flag `must_change_password`; §5.5) y la **Cartelera del Club real** (tablón de anuncios con fijado y tiempo real sobre la tabla `announcements`, sustituyendo el placeholder anterior; `NewsBoard.tsx`, §7.13). Incorpora el **alta manual y la importación de jugadores** por el administrador (pantalla «Fichas jugadores»): alta manual, importación CSV con indicador de estructura y plantilla descargable, y vinculación masiva de fotos desde un ZIP donde el nombre de cada archivo es el identificador del jugador (`PlayerImport.tsx`, `src/lib/playersCsv.ts`, `src/lib/zip.ts`; §7.16-ter). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo. Incorpora también la **documentación por jugador gestionada por el administrador**: ficha federativa cumplimentada, foto y documento de identidad subidos por el admin al bucket `player-docs`, y los campos de **tipo y número de documento** en `players` (pantalla «Fichas jugadores»). Incorpora además la **Fase 1 · Calendario/Partidos** (Módulo 6): tabla `matches` con RLS, creación manual de partidos (admin/coach), importación de Excel deshabilitada, y visualización real de jornada/calendario para todos los roles.
+> Última revisión del código: **2026-07-23** (rama `claude/admin-dynamic-logo-dfdx41`). Incorpora el **logo del club dinámico y editable por el administrador**: pantalla «Configuración» (`LogoSettings.tsx`) donde el admin sube un fichero **PNG/JPG/GIF** al bucket público `branding`, cuya URL se guarda en la tabla clave/valor `app_settings` (`logo_url`) y se lee con el hook `useLogoUrl` en el login (anónimo) y la cabecera, sustituyendo el logo hardcodeado (§3, §7.21). Incorpora también el **acceso por nombre de usuario** además de por email (cuentas provisionadas por el club con email sintético `@sbtmaspalomas.local`; `src/lib/username.ts`, §5.4), la **provisión masiva de cuentas de familias** por el administrador (pantalla «Cuentas de familias»: genera usuario + contraseña temporal por jugador vía la Edge Function `admin-provision-parents`, las guarda en `provisioned_credentials` y permite copiarlas/exportarlas; `FamilyProvisioning.tsx`, §7.20), el **cambio de contraseña obligatorio en el primer acceso** de esas cuentas (`/set-password`, flag `must_change_password`; §5.5) y la **Cartelera del Club real** (tablón de anuncios con fijado y tiempo real sobre la tabla `announcements`, sustituyendo el placeholder anterior; `NewsBoard.tsx`, §7.13). Incorpora el **alta manual y la importación de jugadores** por el administrador (pantalla «Fichas jugadores»): alta manual, importación CSV con indicador de estructura y plantilla descargable, y vinculación masiva de fotos desde un ZIP donde el nombre de cada archivo es el identificador del jugador (`PlayerImport.tsx`, `src/lib/playersCsv.ts`, `src/lib/zip.ts`; §7.16-ter). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo. Incorpora también la **documentación por jugador gestionada por el administrador**: ficha federativa cumplimentada, foto y documento de identidad subidos por el admin al bucket `player-docs`, y los campos de **tipo y número de documento** en `players` (pantalla «Fichas jugadores»). Incorpora además la **Fase 1 · Calendario/Partidos** (Módulo 6): tabla `matches` con RLS, creación manual de partidos (admin/coach), importación de Excel deshabilitada, y visualización real de jornada/calendario para todos los roles.
 >
 > El plan de lo que **falta** por construir frente al plan de inicio del proyecto vive en un documento aparte, [`ROADMAP.md`](./ROADMAP.md).
 
@@ -58,7 +58,7 @@ El cliente Supabase (`src/integrations/supabase/client.ts`) se instancia de form
 - **Tema oscuro** por defecto, definido con variables CSS en espacio de color **OKLCH** (`src/styles.css`).
 - Tokens de diseño: `background`, `surface`, `surface-elevated`, `primary` (rojo), `success`, `warning`, `destructive`, etc.
 - Tipografía display sugerida: *Bebas Neue / Oswald*.
-- Logo servido desde Supabase Storage (bucket público `avatars`).
+- **Logo dinámico**: el logo del club **no está hardcodeado**. Su URL se guarda en la tabla clave/valor `app_settings` (clave `logo_url`) y el administrador puede reemplazarlo cuando quiera subiendo un fichero **PNG, JPG o GIF** al bucket público de Storage `branding` (pantalla «Configuración», `LogoSettings.tsx`; §7.21). El hook `useLogoUrl` (`src/hooks/use-branding.ts`) lo lee tanto en la pantalla de login (usuario anónimo) como en la cabecera de la app, con respaldo al logo histórico si aún no hay ninguno configurado, y se refresca al instante vía el evento `app-logo-updated`.
 - Toasts con `sonner` en tema oscuro, posición `top-center`.
 
 ---
@@ -162,10 +162,11 @@ Menú lateral filtrado según el rol efectivo (un perfil hijo se trata como `pla
 | Cuotas y pagos | ✔ | | ✔ | | ✔ | ✔ | |
 | Control de asistencia | | ✔ | | | | | |
 | Chats | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| Configuración (LogoSettings) | ✔ | | | | | | |
 
 ### 6.3 Cabecera y `Home`
 
-- Cabecera con logo, nombre del club, ficha del usuario/perfil activo (iniciales o avatar), botones de **cambiar perfil**, **reiniciar datos demo** y **cerrar sesión**.
+- Cabecera con logo (dinámico, leído con `useLogoUrl`; §3, §7.21), nombre del club, ficha del usuario/perfil activo (iniciales o avatar), botones de **cambiar perfil**, **reiniciar datos demo** y **cerrar sesión**.
 - `Home` muestra bienvenida contextual por rol. Para admins, tarjetas de estadísticas (jugadores, aprobados, pendientes, pagos pendientes). Accesos rápidos ("Próximos partidos", "Chats", "Validar documentos", etc.).
 - El panel de **Adultos Responsables** muestra el identificador de la cuenta (`reference_code`).
 
@@ -417,6 +418,18 @@ Seguridad: la tabla `provisioned_credentials` es **solo admin** (RLS `prov_creds
 
 ---
 
+### 7.21 Configuración · Logo del club — `LogoSettings.tsx` (solo admin)
+
+Pantalla **"Configuración"** (nav admin, icono engranaje) para gestionar la **identidad visual dinámica** de la aplicación. En su primera funcionalidad permite al administrador **cambiar el logo del club** cuando quiera:
+
+- **Formatos admitidos**: PNG, JPG y GIF; **tamaño máximo 3 MB**. Se valida el `MIME type` y el tamaño en cliente antes de subir.
+- **Flujo**: el admin selecciona una imagen, ve una **vista previa comparada** (logo actual → logo nuevo) y pulsa **"Guardar logo"**. El fichero se sube al bucket público de Storage `branding` con un **nombre único por timestamp** (`logo_<ts>.<ext>`, evita servir una versión cacheada antigua), se obtiene su URL pública y se guarda en `app_settings.logo_url` (upsert por `key`).
+- **Propagación en vivo**: al guardar se emite el evento `app-logo-updated`; el hook `useLogoUrl` (`src/hooks/use-branding.ts`) actualiza al instante el logo de la **cabecera** y de la **pantalla de login** sin recargar. La lectura de `app_settings.logo_url` funciona también para el usuario **anónimo** del login (RLS de lectura pública).
+
+Seguridad: la tabla `app_settings` y el bucket `branding` permiten **lectura a cualquiera** (`anon`+`authenticated`) pero **escritura solo al administrador** (RLS `app_settings_admin_write`, `branding_admin_insert/update/delete` comprobando `public.has_role(auth.uid(), 'admin')`). Respaldo: si aún no hay logo configurado o falla la lectura, se usa `DEFAULT_LOGO_URL` (el logo histórico), semilla también de `app_settings.logo_url` en la migración.
+
+---
+
 ## 8. Capa de datos (Supabase)
 
 ### 8.1 Store de demo (`clubStore.ts` + `use-club-data.tsx`)
@@ -452,6 +465,7 @@ Tablas con **Row Level Security (RLS)** activada:
 | `equipment_sizes` | Tallas de equipación por jugador | Familia/senior gestionan lo suyo; admin/coach leen |
 | `announcements` | Cartelera del club (título, cuerpo, `pinned`, autor) | Autenticados leen; admin/coach publican/editan/borran (firmando `author_id`) |
 | `provisioned_credentials` | Credenciales generadas por el club (usuario + contraseña temporal por jugador/familia) | **Solo admin** (`prov_creds_admin_all`); el padre borra la suya vía RPC `clear_my_provisioned_password` |
+| `app_settings` | Ajustes globales clave/valor de la app (primer ajuste: `logo_url`) | **Lectura pública** (`anon`+`authenticated`, para el login); **escritura solo admin** (`app_settings_admin_write`) |
 
 Estas tablas están **versionadas en `supabase/migrations/`** desde el saneamiento de la **Fase 0** (migraciones `20260721090000`–`20260721090300`), las **Fases 2-5** (migraciones `20260722100000`–`20260722100300`) y la **Fase 1 · Calendario/Partidos** (migración `20260723100000_matches.sql`, que además siembra unos partidos de ejemplo), y **tipadas en `src/integrations/supabase/types.ts`** sin accesos `as any`.
 
@@ -469,7 +483,8 @@ Estas tablas están **versionadas en `supabase/migrations/`** desde el saneamien
 
 ### 8.3 Storage
 
-- Bucket público **`avatars`** (logo del club, avatares).
+- Bucket público **`avatars`** (avatares y logo histórico del club).
+- Bucket público **`branding`** (logo del club editable por el administrador; §7.21). **Lectura pública** (`anon`+`authenticated`, para el login sin sesión) y **escritura solo admin** (`branding_admin_insert/update/delete`).
 - Bucket **`player-docs`** (documentación de registro, comprobantes de pago, avatares subidos y **documentación por jugador subida por el admin** en `players/${playerId}/…`: ficha federativa, foto y documento de identidad). Además de las políticas por carpeta de usuario (`${auth.uid()}/…`), el administrador tiene acceso total al bucket vía `player_docs_admin_all`.
 
 ### 8.4 Realtime

@@ -24,10 +24,12 @@ import { PlayerDocuments } from "@/components/club/PlayerDocuments";
 import { DorsalManager } from "@/components/club/DorsalManager";
 import { EquipmentSizes } from "@/components/club/EquipmentSizes";
 import { MatchesManager } from "@/components/club/MatchesManager";
+import { LogoSettings } from "@/components/club/LogoSettings";
 import { useMatches } from "@/hooks/use-matches";
+import { useLogoUrl } from "@/hooks/use-branding";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash, CalendarDays, IdCard, KeyRound,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash, CalendarDays, IdCard, KeyRound, Settings,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -40,7 +42,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "fichas" | "dorsales" | "tallas" | "partidos" | "cuentas";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "fichas" | "dorsales" | "tallas" | "partidos" | "cuentas" | "ajustes";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"] },
@@ -62,6 +64,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family", "senior"] },
   { id: "asistencia", label: "Control de asistencia", icon: ClipboardCheck, roles: ["coach"] },
   { id: "chats", label: "Chats", icon: MessagesSquare, roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"] },
+  { id: "ajustes", label: "Configuración", icon: Settings, roles: ["admin"] },
 ];
 
 function ClubApp() {
@@ -69,6 +72,7 @@ function ClubApp() {
   useClubData();
   const navigate = useNavigate();
   const user = useClub(currentUser);
+  const { logoUrl } = useLogoUrl();
   const [view, setView] = useState<View>("inicio");
   const [navOpen, setNavOpen] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState<boolean | null>(null);
@@ -213,7 +217,7 @@ function ClubApp() {
             {navOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <img src="https://kiifznmcpyvalupdtnrq.supabase.co/storage/v1/object/public/avatars/SBT%20logo-.png" alt="SBT Maspalomas" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+            <img src={logoUrl} alt="SBT Maspalomas" className="h-9 w-9 shrink-0 rounded-full object-cover" />
             <div className="min-w-0">
               <div className="truncate text-sm font-black uppercase tracking-wider">SBT Maspalomas</div>
               <div className="truncate text-[11px] text-muted-foreground">El Baloncesto en el Sur · Gran Canaria</div>
@@ -303,6 +307,7 @@ function ClubApp() {
               {view === "pagos" && auth.role === "senior" && <PaymentsParent playerId={auth.selfPlayerId ?? undefined} />}
               {view === "asistencia" && auth.role === "coach" && <Attendance />}
               {view === "chats" && <Chats />}
+              {view === "ajustes" && auth.role === "admin" && <LogoSettings />}
             </>
           )}
         </main>
