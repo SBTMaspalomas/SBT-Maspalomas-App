@@ -137,7 +137,10 @@ export function ConvocatoriesManager() {
     });
 
     if (error) {
-      toast.error("Error al crear convocatoria");
+      // Mostramos el motivo real (RLS, columna inexistente, restricción…) en
+      // lugar de un genérico, para que el error sea diagnosticable de un vistazo.
+      console.error("Error al crear convocatoria", error);
+      toast.error(`Error al crear convocatoria: ${error.message}`);
       return;
     }
 
@@ -150,7 +153,8 @@ export function ConvocatoriesManager() {
   const handleDeleteConvocatoria = async (id: string) => {
     const { error } = await supabase.from("convocatorias").delete().eq("id", id);
     if (error) {
-      toast.error("Error al eliminar convocatoria");
+      console.error("Error al eliminar convocatoria", error);
+      toast.error(`Error al eliminar convocatoria: ${error.message}`);
       return;
     }
     toast.success("Convocatoria eliminada");
@@ -201,7 +205,7 @@ export function ConvocatoriesManager() {
       player_id: playerId,
       created_by: user.id,
     });
-    if (error) { toast.error("No se pudo doblar al jugador"); return; }
+    if (error) { console.error("No se pudo doblar al jugador", error); toast.error(`No se pudo doblar al jugador: ${error.message}`); return; }
     toast.success("Jugador doblado");
     loadData();
   };
@@ -212,7 +216,7 @@ export function ConvocatoriesManager() {
       .delete()
       .eq("convocatoria_id", conv.id)
       .eq("player_id", playerId);
-    if (error) { toast.error("No se pudo quitar al jugador"); return; }
+    if (error) { console.error("No se pudo quitar al jugador", error); toast.error(`No se pudo quitar al jugador: ${error.message}`); return; }
     loadData();
   };
 
