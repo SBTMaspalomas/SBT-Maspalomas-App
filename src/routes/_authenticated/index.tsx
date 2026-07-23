@@ -13,6 +13,7 @@ import { Attendance } from "@/components/club/Attendance";
 import { Chats } from "@/components/club/Chats";
 import { NewsBoard } from "@/components/club/NewsBoard";
 import { RoleManager } from "@/components/club/RoleManager";
+import { FamilyProvisioning } from "@/components/club/FamilyProvisioning";
 import { PlayerView } from "@/components/club/PlayerView";
 import { FamilySelector } from "@/components/club/FamilySelector";
 import { TeamsManager } from "@/components/club/TeamsManager";
@@ -26,7 +27,7 @@ import { MatchesManager } from "@/components/club/MatchesManager";
 import { useMatches } from "@/hooks/use-matches";
 import type { Role } from "@/lib/clubStore";
 import {
-  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash, CalendarDays, IdCard,
+  LayoutDashboard, FileSignature, ShieldCheck, Wallet, ClipboardCheck, MessagesSquare, Newspaper, RefreshCw, Menu, X, LogOut, Users, Trophy, ArrowLeftRight, Users2, Zap, FileText, Shirt, Hash, CalendarDays, IdCard, KeyRound,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ClubApp,
 });
 
-type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "fichas" | "dorsales" | "tallas" | "partidos";
+type View = "inicio" | "registro" | "validacion" | "pagos" | "asistencia" | "chats" | "cartelera" | "roles" | "mizona" | "miembros" | "equipos" | "convocatorias" | "mis-convocatorias" | "federativa" | "fichas" | "dorsales" | "tallas" | "partidos" | "cuentas";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { id: "inicio", label: "Inicio", icon: LayoutDashboard, roles: ["admin", "coach", "parent", "player", "family", "senior", "staff"] },
@@ -50,6 +51,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
   { id: "federativa", label: "Ficha federativa", icon: FileText, roles: ["family", "senior"] },
   { id: "miembros", label: "Miembros", icon: Users2, roles: ["admin"] },
+  { id: "cuentas", label: "Cuentas de familias", icon: KeyRound, roles: ["admin"] },
   { id: "fichas", label: "Fichas jugadores", icon: IdCard, roles: ["admin"] },
   { id: "equipos", label: "Equipos", icon: Zap, roles: ["admin"] },
   { id: "convocatorias", label: "Convocatorias", icon: ClipboardCheck, roles: ["admin", "coach"] },
@@ -104,6 +106,14 @@ function ClubApp() {
     }
   }, [auth.loading, auth.role, navigate]);
 
+  // Cuentas provisionadas por el club: forzar el cambio de la contraseña temporal
+  // en el primer acceso, antes de cualquier otra pantalla (incluido el registro).
+  useEffect(() => {
+    if (!auth.loading && auth.mustChangePassword) {
+      navigate({ to: "/set-password" });
+    }
+  }, [auth.loading, auth.mustChangePassword, navigate]);
+
   // Show loading state while auth is being resolved
   if (auth.loading) {
     return (
@@ -118,6 +128,11 @@ function ClubApp() {
 
   // If no role is set yet, show a fallback while the redirect effect runs
   if (!auth.role) {
+    return null;
+  }
+
+  // Mientras se redirige a /set-password no renderizamos el panel ni el registro.
+  if (auth.mustChangePassword) {
     return null;
   }
 
@@ -272,6 +287,7 @@ function ClubApp() {
               {view === "partidos" && <MatchesManager />}
               {view === "registro" && <RegistrationFlow />}
               {view === "miembros" && auth.role === "admin" && <RoleManager />}
+              {view === "cuentas" && auth.role === "admin" && <FamilyProvisioning />}
               {view === "fichas" && auth.role === "admin" && <PlayerDocuments />}
               {view === "equipos" && auth.role === "admin" && <TeamsManager />}
               {view === "convocatorias" && (auth.role === "admin" || auth.role === "coach") && <ConvocatoriesManager />}

@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { toLoginEmail } from "@/lib/username";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,7 +59,12 @@ function AuthPage() {
   const onLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // El campo admite email o nombre de usuario; toLoginEmail construye el email
+    // sintético cuando se teclea un usuario (sin `@`).
+    const { error } = await supabase.auth.signInWithPassword({
+      email: toLoginEmail(email),
+      password,
+    });
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("¡Bienvenido!");
@@ -134,8 +140,8 @@ function AuthPage() {
             <TabsContent value="login">
               <form onSubmit={onLogin} className="space-y-4 rounded-2xl border border-border bg-surface p-5">
                 <div className="space-y-2">
-                  <Label htmlFor="le">Email</Label>
-                  <Input id="le" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <Label htmlFor="le">Email o usuario</Label>
+                  <Input id="le" type="text" autoCapitalize="none" autoCorrect="off" required value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lp">Contraseña</Label>
