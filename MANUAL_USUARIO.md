@@ -28,6 +28,7 @@ Está pensado para que **cualquier persona** —aunque no tenga experiencia con 
    - 4.12 [Hacer convocatorias](#412-hacer-convocatorias)
    - 4.13 [La Cartelera (tablón de anuncios)](#413-la-cartelera-tablón-de-anuncios)
    - 4.14 [Los chats y su gestión](#414-los-chats-y-su-gestión)
+   - 4.15 [Cambiar el logo del club (Configuración)](#415-cambiar-el-logo-del-club-configuración)
 5. [Guía del ENTRENADOR](#5-guía-del-entrenador)
 6. [Guía de la FAMILIA (padres y tutores)](#6-guía-de-la-familia-padres-y-tutores)
    - 6.1 [Completar el registro federativo](#61-completar-el-registro-federativo)
@@ -149,7 +150,7 @@ Arriba a la derecha hay tres botones:
 
 ## 4. Guía del ADMINISTRADOR (gestión completa del club)
 
-El administrador tiene acceso a **todo**. En el menú de la izquierda verás estas secciones: Inicio, Cartelera, Partidos, Registro federativo, Miembros, Cuentas de familias, Fichas jugadores, Equipos, Convocatorias, Dorsales, Validación docs., Cuotas y pagos y Chats.
+El administrador tiene acceso a **todo**. En el menú de la izquierda verás estas secciones: Inicio, Cartelera, Partidos, Registro federativo, Miembros, Cuentas de familias, Fichas jugadores, Equipos, Convocatorias, Dorsales, Validación docs., Cuotas y pagos, Chats y Configuración.
 
 > **Orden recomendado para arrancar un club desde cero:**
 > 1. Crea los **equipos** (4.2).
@@ -369,6 +370,32 @@ Menú **→ Chats**. La mensajería del club funciona en **tiempo real**. Hay va
 - **Activar / desactivar** el canal.
 - Cambiar su **estado**: **abierto** (se escribe), **cerrado** (solo lectura) o **archivado** (oculto).
 - **Eliminar** el canal, lo que **borra su historial de mensajes** (te pedirá confirmación porque no se puede deshacer).
+
+---
+
+### 4.15 Cambiar el logo del club (Configuración)
+
+Menú **→ Configuración** (icono de engranaje, visible solo para el administrador). Desde aquí puedes **cambiar el logo del club cuando quieras**, sin tocar ningún código. El logo aparece en la **pantalla de entrada** (la de iniciar sesión) y en la **cabecera** de la app, arriba a la izquierda.
+
+**Cómo cambiarlo, paso a paso:**
+
+1. Entra en **Configuración** y busca el recuadro **"Logo del club"**.
+2. A la izquierda verás el **logo actual**.
+3. Pulsa en el recuadro **"Pulsa para seleccionar una imagen"** y elige el archivo desde tu dispositivo.
+4. Verás una **vista previa comparada**: a la izquierda el logo actual y a la derecha, el **nuevo**. Si te has equivocado, pulsa la **✕** sobre la vista previa para descartarla y elegir otra.
+5. Cuando estés conforme, pulsa **"Guardar logo"**. En unos segundos aparecerá el mensaje *"Logo actualizado"* y el logo cambiará **al instante** en toda la app (no hace falta recargar la página).
+
+**Requisitos del archivo:**
+
+- **Formatos admitidos:** **PNG**, **JPG** o **GIF**.
+- **Tamaño máximo:** **3 MB**. Si tu imagen pesa más, redúcela antes de subirla.
+- **Recomendado:** una imagen **cuadrada** (por ejemplo 512×512 píxeles) para que se vea bien dentro del círculo del logo.
+
+**Cosas a tener en cuenta:**
+
+- El cambio afecta a **todos los usuarios**: el nuevo logo lo verá todo el mundo (familias, entrenadores, jugadores…), tanto al entrar como dentro de la app.
+- Puedes cambiarlo **tantas veces como quieras**; cada vez sustituye al anterior.
+- Si nunca has subido un logo, la app muestra el **logo de siempre** del club por defecto.
 
 ---
 
