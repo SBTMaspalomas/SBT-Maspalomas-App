@@ -7,6 +7,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { toast } from "sonner";
 import { UserCog, Baby, ShieldCheck, CalendarDays, ArrowLeft, LogOut, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSignedPlayerDoc } from "@/lib/storage";
 import { AvatarUpload } from "./AvatarUpload";
 
 function initials(name: string) {
@@ -148,6 +149,7 @@ function ChildTile({ child, onClick }: { child: FamilyChild; onClick: () => void
   const age = ageFrom(child.birth_date);
   const [teamName, setTeamName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const signedAvatar = useSignedPlayerDoc(avatarUrl);
 
   useEffect(() => {
     if (!child.team_id) return;
@@ -171,8 +173,8 @@ function ChildTile({ child, onClick }: { child: FamilyChild; onClick: () => void
     <div className="group flex flex-col items-center gap-2 rounded-2xl p-3 transition-transform hover:-translate-y-1">
       <div className="relative">
         <button onClick={onClick} className="grid h-24 w-24 place-items-center rounded-2xl bg-gradient-to-br from-success/70 to-primary/60 text-primary-foreground shadow-lg ring-2 ring-transparent transition-all group-hover:ring-primary sm:h-28 sm:w-28 overflow-hidden">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={child.full_name} className="h-full w-full object-cover" />
+          {signedAvatar ? (
+            <img src={signedAvatar} alt={child.full_name} className="h-full w-full object-cover" />
           ) : (
             <span className="text-2xl font-black sm:text-3xl">{initials(child.full_name)}</span>
           )}
