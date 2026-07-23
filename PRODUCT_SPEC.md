@@ -2,7 +2,7 @@
 
 > Documento técnico-funcional que describe **todo lo implementado** en la aplicación de gestión del club de baloncesto **SBT Maspalomas** ("El Baloncesto en el Sur · Gran Canaria").
 >
-> Última revisión del código: **2026-07-21** (rama `claude/import-players-photos-aee4qw`). Incorpora el **alta manual y la importación de jugadores** por el administrador (pantalla «Fichas jugadores»): alta manual, importación CSV con indicador de estructura y plantilla descargable, y vinculación masiva de fotos desde un ZIP donde el nombre de cada archivo es el identificador del jugador (`PlayerImport.tsx`, `src/lib/playersCsv.ts`, `src/lib/zip.ts`; §7.16-ter). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo. Incorpora también la **documentación por jugador gestionada por el administrador**: ficha federativa cumplimentada, foto y documento de identidad subidos por el admin al bucket `player-docs`, y los campos de **tipo y número de documento** en `players` (pantalla «Fichas jugadores»). Incorpora además la **Fase 1 · Calendario/Partidos** (Módulo 6): tabla `matches` con RLS, creación manual de partidos (admin/coach), importación de Excel deshabilitada, y visualización real de jornada/calendario para todos los roles.
+> Última revisión del código: **2026-07-23** (rama `claude/user-manual-comprehensive-wsuvrt`). Incorpora el **acceso por nombre de usuario** además de por email (cuentas provisionadas por el club con email sintético `@sbtmaspalomas.local`; `src/lib/username.ts`, §5.4), la **provisión masiva de cuentas de familias** por el administrador (pantalla «Cuentas de familias»: genera usuario + contraseña temporal por jugador vía la Edge Function `admin-provision-parents`, las guarda en `provisioned_credentials` y permite copiarlas/exportarlas; `FamilyProvisioning.tsx`, §7.20), el **cambio de contraseña obligatorio en el primer acceso** de esas cuentas (`/set-password`, flag `must_change_password`; §5.5) y la **Cartelera del Club real** (tablón de anuncios con fijado y tiempo real sobre la tabla `announcements`, sustituyendo el placeholder anterior; `NewsBoard.tsx`, §7.13). Incorpora el **alta manual y la importación de jugadores** por el administrador (pantalla «Fichas jugadores»): alta manual, importación CSV con indicador de estructura y plantilla descargable, y vinculación masiva de fotos desde un ZIP donde el nombre de cada archivo es el identificador del jugador (`PlayerImport.tsx`, `src/lib/playersCsv.ts`, `src/lib/zip.ts`; §7.16-ter). Incorpora los chats por rol (Admin/Entrenadores/Staff) y su gestión por el administrador, los tipos de usuario adulto en el registro (Responsable/Senior/Entrenador/Staff), el soporte multi-equipo (`player_teams`), las cuotas editables y el **saneamiento de la Fase 0**. Añade las **Fases 2-5** del roadmap: convocatorias completas (mínimo federativo, roster con estado en vivo y "doblar" jugadores), **asistencia persistida en Supabase**, **Ficha Federativa PDF** integrada en el semáforo del validador, y **dorsales blindados por equipo + tallas de equipación** condicionales al nivel del equipo. Incorpora también la **documentación por jugador gestionada por el administrador**: ficha federativa cumplimentada, foto y documento de identidad subidos por el admin al bucket `player-docs`, y los campos de **tipo y número de documento** en `players` (pantalla «Fichas jugadores»). Incorpora además la **Fase 1 · Calendario/Partidos** (Módulo 6): tabla `matches` con RLS, creación manual de partidos (admin/coach), importación de Excel deshabilitada, y visualización real de jornada/calendario para todos los roles.
 >
 > El plan de lo que **falta** por construir frente al plan de inicio del proyecto vive en un documento aparte, [`ROADMAP.md`](./ROADMAP.md).
 
@@ -72,6 +72,7 @@ Enrutado basado en ficheros (TanStack Router). Árbol generado en `src/routeTree
 | `/` (raíz shell) | `src/routes/__root.tsx` | Shell HTML, `QueryClientProvider`, `AuthProvider`, boundaries de error/404, metadatos. |
 | `/auth` | `src/routes/auth.tsx` | Login / registro / recuperación de contraseña / Google OAuth. |
 | `/reset-password` | `src/routes/reset-password.tsx` | Establecer nueva contraseña tras enlace de recuperación. |
+| `/set-password` | `src/routes/set-password.tsx` | Primer acceso de cuentas provisionadas: reemplazar la contraseña temporal (§5.5). |
 | `/_authenticated` | `src/routes/_authenticated/route.tsx` | Layout protegido. `beforeLoad` verifica sesión con `supabase.auth.getUser()`; si no hay usuario → redirige a `/auth`. `ssr: false`. |
 | `/_authenticated/` | `src/routes/_authenticated/index.tsx` | **Aplicación principal** (`ClubApp`): cabecera, navegación por rol y renderizado de la vista activa. |
 
@@ -119,10 +120,14 @@ Las cuentas `family` **no** entran directamente al panel: primero eligen un **pe
 
 ### 5.4 Flujo de la pantalla `/auth`
 
-- **Entrar**: email + contraseña (`signInWithPassword`), con toggle de visibilidad de contraseña.
-- **Registrarse**: nombre completo + email + contraseña (mín. 8 caracteres). Auto-confirmación activa → sesión inmediata.
+- **Entrar**: el campo se etiqueta **"Email o usuario"** y admite ambos. `src/lib/username.ts` (`toLoginEmail`) detecta si el texto contiene `@`: si es un email lo usa tal cual; si es un **nombre de usuario** (cuentas provisionadas por el club, §7.20) reconstruye el email sintético `<usuario>@sbtmaspalomas.local` con el que autentica contra Supabase (`signInWithPassword`). Toggle de visibilidad de contraseña.
+- **Registrarse**: nombre completo + email + contraseña (mín. 8 caracteres). Auto-confirmación activa → sesión inmediata. El registro público siempre crea una cuenta de **Padre / Tutor** (rol `family`); las cuentas de admin y entrenador las gestiona el club.
 - **¿Olvidaste tu contraseña?**: `resetPasswordForEmail` → enlace a `/reset-password`.
 - **Continuar con Google**: OAuth vía SDK de Lovable Cloud.
+
+### 5.5 Primer acceso de cuentas provisionadas (`/set-password`)
+
+Las cuentas creadas por el administrador para los padres/tutores (§7.20) nacen con una **contraseña temporal** y el flag `user_metadata.must_change_password = true`. `AuthProvider` expone ese flag como `auth.mustChangePassword`. En cuanto el usuario inicia sesión con la contraseña temporal, `ClubApp` lo **redirige a `/set-password`** antes de cualquier otra pantalla (incluso antes del registro federativo). Allí elige su contraseña definitiva (mín. 8 caracteres, con confirmación); al guardar se ejecuta `updateUser({ password, data: { must_change_password: false } })` y la RPC `clear_my_provisioned_password`, que **borra la contraseña temporal** guardada en `provisioned_credentials` y marca la credencial como usada. Solo cuando el contexto refleja el flag limpio se navega al panel.
 
 ---
 
@@ -136,23 +141,27 @@ Para roles `family` / `parent`, al entrar se consulta la tabla `registrations` (
 
 ### 6.2 Navegación por rol
 
-Menú lateral filtrado según el rol efectivo (un perfil hijo se trata como `player`). Desde la vista de **Equipos** el admin accede además a la **asignación de jugadores a equipos** (fusionada dentro del panel de Equipos) y al **gestor de chats** (`ChatsManager`, §7.15):
+Menú lateral filtrado según el rol efectivo (un perfil hijo se trata como `player`). El orden y las etiquetas provienen del array `NAV` de `src/routes/_authenticated/index.tsx`. Desde la vista de **Equipos** el admin accede además a la **asignación de jugadores a equipos** (fusionada dentro del panel de Equipos) y al **gestor de chats** (`ChatsManager`, §7.15). La entrada **"Mi zona"** (PlayerView independiente) está **oculta** de momento (`roles: []`); el perfil hijo sigue viendo `PlayerView` en su pantalla de Inicio.
 
-| Vista | admin | coach | parent | player | family |
-|-------|:---:|:---:|:---:|:---:|:---:|
-| Inicio | ✔ | ✔ | ✔ | ✔ | ✔ |
-| Mi zona (PlayerView) | | | | ✔ | |
-| Cartelera | ✔ | ✔ | ✔ | | ✔ |
-| Partidos (MatchesManager) | ✔ | ✔ | ✔ | | ✔ |
-| Registro federativo | ✔ | | ✔ | | ✔ |
-| Miembros (RoleManager) | ✔ | | | | |
-| Equipos (TeamsManager) | ✔ | | | | |
-| Convocatorias | ✔ | ✔ | | | |
-| Mis Convocatorias | | | | ✔ | |
-| Validación docs. | ✔ | | | | |
-| Cuotas y pagos | ✔ | | ✔ | | ✔ |
-| Control de asistencia | | ✔ | | | |
-| Chats | ✔ | ✔ | ✔ | ✔ | ✔ |
+| Vista (etiqueta del menú) | admin | coach | parent | player | family | senior | staff |
+|-------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Inicio | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| Cartelera | ✔ | ✔ | ✔ | | ✔ | ✔ | ✔ |
+| Partidos (MatchesManager) | ✔ | ✔ | ✔ | | ✔ | ✔ | ✔ |
+| Registro federativo | ✔ | | ✔ | | ✔ | | |
+| Ficha federativa | | | | | ✔ | ✔ | |
+| Miembros (RoleManager) | ✔ | | | | | | |
+| Cuentas de familias (FamilyProvisioning) | ✔ | | | | | | |
+| Fichas jugadores (PlayerDocuments) | ✔ | | | | | | |
+| Equipos (TeamsManager) | ✔ | | | | | | |
+| Convocatorias | ✔ | ✔ | | | | | |
+| Mis Convocatorias | | | | ✔ | | ✔ | |
+| Dorsales (DorsalManager) | ✔ | ✔ | | | | | |
+| Tallas / Equipación (EquipmentSizes) | | | | | ✔ | ✔ | |
+| Validación docs. | ✔ | | | | | | |
+| Cuotas y pagos | ✔ | | ✔ | | ✔ | ✔ | |
+| Control de asistencia | | ✔ | | | | | |
+| Chats | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 
 ### 6.3 Cabecera y `Home`
 
@@ -320,10 +329,15 @@ La construcción de la lista de canales depende del rol:
 
 Reglas de acceso reforzadas en base de datos (RLS + función `user_can_access_team_channel`, ampliada para conceder acceso `admins→admin`, `coaches→coach`, `staff→staff`). La escritura además exige que el canal esté abierto (`chat_channel_open`). Marca de leídos en mensajes privados. Escucha el evento `open-private-chat` para saltar a la conversación con una familia concreta.
 
-### 7.13 Cartelera / Tablón
+### 7.13 Cartelera / Tablón — `NewsBoard.tsx` (todos los roles)
 
-- **`NewsBoard.tsx`**: pantalla de bienvenida del tablón general — actualmente **placeholder** ("Próximamente").
-- **`Board.tsx`**: componente más completo (jornada / información con PDFs / tablón con publicación de anuncios por admin/coach) que opera sobre el *demo store*. No está enlazado en la navegación actual (queda como base para la cartelera definitiva).
+Tablón general del club, ya **funcional** sobre la tabla real `announcements` (sustituye al antiguo placeholder). Es la vista **"Cartelera"** del menú:
+
+- **Lectura (todos los roles autenticados)**: lista de anuncios ordenada por **fijados primero** y luego por fecha (más reciente arriba). Cada anuncio muestra título, cuerpo, autor (nombre del admin/coach o "Equipo del club") y fecha/hora local. Los anuncios **fijados** se resaltan con el color corporativo y un icono de chincheta.
+- **Gestión (solo admin y coach)**: bloque **"Publicar anuncio"** con título (obligatorio) y cuerpo; por cada anuncio, botones para **fijar/desfijar arriba** (`pinned`) y **eliminar**. El autor se firma con el `uid` de quien publica.
+- **Tiempo real**: la cartelera se refresca en vivo (Supabase Realtime sobre `announcements`) cuando cualquier admin/coach publica, edita o borra.
+
+> `Board.tsx` (componente heredado sobre el *demo store*, con jornada/PDFs) permanece en el repo pero **no está enlazado** en la navegación; la cartelera activa es `NewsBoard.tsx`. La pestaña **"Tablón"** dentro de `PlayerView` (§7.9) es independiente y sigue leyendo de `club_events` vía el store demo.
 
 ### 7.14 `PlayersList.tsx`
 
@@ -391,6 +405,16 @@ Sección **"Partidos"** del menú, núcleo del **Módulo 6 (Fase 1)**. Es un com
 
 Los datos se leen con el hook **`useMatches(teamIds?)`** (`src/hooks/use-matches.ts`) y se formatean con los helpers puros de **`src/lib/matches.ts`** (`sortMatches`, `localVisitante`, `mapsUrl`), reutilizados también por `PlayerView` (§7.9), `FamilyAgenda` (`FamilySelector`).
 
+### 7.20 Cuentas de familias — `FamilyProvisioning.tsx` (solo admin)
+
+Pantalla **"Cuentas de familias"** (nav admin, icono llave) que permite al administrador **crear cuentas de acceso para los padres/tutores sin depender del registro público**. Es el paso natural tras importar los jugadores por CSV (§7.16-ter): el club da de alta a los jugadores y luego genera credenciales para sus familias.
+
+- **Generación por equipo**: el admin elige un equipo y ve la lista de sus jugadores **que aún no tienen un tutor con acceso** (su familia no existe, o existe pero sin adulto responsable vinculado —`families_meta.head_profile_id` nulo—). Puede seleccionar varios (o "Seleccionar todos") y pulsar **"Generar N cuenta(s)"**.
+- **Edge Function `admin-provision-parents`** (`service_role`): valida que el llamante es admin y, por cada jugador, crea un usuario de Auth con **email sintético** `<usuario>@sbtmaspalomas.local`, un **nombre de usuario único** (derivado del nombre, con desambiguación numérica) y una **contraseña temporal** legible (12 caracteres sin símbolos ambiguos). Marca `must_change_password`, asigna rol `family`, **reutiliza o crea la familia** (`families_meta`) y engancha al jugador (`players.family_id`). Guarda las credenciales en `provisioned_credentials`.
+- **Reparto de credenciales**: la pantalla muestra el resultado inmediato con las contraseñas visibles y una tabla de **"Credenciales pendientes de entrega"** con acciones **"Copiar todo"** y **"Exportar CSV"** (`credenciales_familias.csv`). La contraseña temporal **desaparece automáticamente** en cuanto el tutor la cambia en su primer acceso (§5.5); las ya usadas se muestran atenuadas y marcadas como "Usada".
+
+Seguridad: la tabla `provisioned_credentials` es **solo admin** (RLS `prov_creds_admin_all`); el padre invalida su propia contraseña temporal con la RPC `clear_my_provisioned_password` (`SECURITY DEFINER`).
+
 ---
 
 ## 8. Capa de datos (Supabase)
@@ -405,7 +429,7 @@ Tablas con **Row Level Security (RLS)** activada:
 
 | Tabla | Propósito | Notas de acceso |
 |-------|-----------|-----------------|
-| `profiles` | Perfil de usuario (email, nombre, avatar, teléfono) | Lectura/edición propia; admin lee todos |
+| `profiles` | Perfil de usuario (email, **`username`**, nombre, avatar, teléfono) | Lectura/edición propia; admin lee todos. `username` único (case-insensitive) para las cuentas provisionadas |
 | `user_roles` | Roles por usuario (enum `app_role`) | Lectura propia; admin gestiona todos |
 | `coach_teams` | Equipos asignados a un entrenador | Admin gestiona; coach lee lo suyo |
 | `teams` | Equipos (nombre, categoría, `age_category`, `travels`) | Lectura para autenticados; admin gestiona |
@@ -426,11 +450,14 @@ Tablas con **Row Level Security (RLS)** activada:
 | `convocatoria_extra_players` | Jugadores "doblados" en una convocatoria | Admin/coach gestionan; jugador/familia leen lo suyo |
 | `attendance` | Asistencia por jugador/equipo/día (`status`, `absent_reason`) | Admin/coach gestionan (`recorded_by = auth.uid()`); jugador/familia leen lo suyo |
 | `equipment_sizes` | Tallas de equipación por jugador | Familia/senior gestionan lo suyo; admin/coach leen |
+| `announcements` | Cartelera del club (título, cuerpo, `pinned`, autor) | Autenticados leen; admin/coach publican/editan/borran (firmando `author_id`) |
+| `provisioned_credentials` | Credenciales generadas por el club (usuario + contraseña temporal por jugador/familia) | **Solo admin** (`prov_creds_admin_all`); el padre borra la suya vía RPC `clear_my_provisioned_password` |
 
 Estas tablas están **versionadas en `supabase/migrations/`** desde el saneamiento de la **Fase 0** (migraciones `20260721090000`–`20260721090300`), las **Fases 2-5** (migraciones `20260722100000`–`20260722100300`) y la **Fase 1 · Calendario/Partidos** (migración `20260723100000_matches.sql`, que además siembra unos partidos de ejemplo), y **tipadas en `src/integrations/supabase/types.ts`** sin accesos `as any`.
 
 **Funciones y triggers relevantes**:
-- `handle_new_user()` — crea `profiles` + rol por defecto (`family`, o `admin` para emails bootstrap) y auto-vincula familias por email.
+- `handle_new_user()` — crea `profiles` (incluido **`username`** desde la metadata) + rol por defecto (`family`, o `admin` para emails bootstrap) y auto-vincula familias por email.
+- `clear_my_provisioned_password()` — RPC `SECURITY DEFINER` que el propio padre/tutor ejecuta en su primer acceso para **invalidar su contraseña temporal** (pone `temp_password = NULL`, `used = true`) en `provisioned_credentials`.
 - `has_role(user, role)` — helper `SECURITY DEFINER` usado en las políticas RLS.
 - `set_self_registration_role()` — RPC `SECURITY DEFINER` que fija el rol principal del propio usuario al terminar el registro (responsable/senior/coach/staff).
 - `set_player_dorsal(_player_id, _team_id, _dorsal)` — RPC `SECURITY DEFINER` que fija el dorsal de un jugador en un equipo (upsert en `player_teams`); solo admin/coach, con dorsal único por equipo.
@@ -447,7 +474,7 @@ Estas tablas están **versionadas en `supabase/migrations/`** desde el saneamien
 
 ### 8.4 Realtime
 
-Publicación `supabase_realtime` incluye `team_messages`, `private_messages` y, desde la Fase 2, `convocatoria_responses` y `convocatoria_extra_players` (para el refresco en vivo del panel de convocatorias del entrenador). `useClubData` también se suscribe a cambios de esquema para refrescar el store demo.
+Publicación `supabase_realtime` incluye `team_messages`, `private_messages`, desde la Fase 2 `convocatoria_responses` y `convocatoria_extra_players` (para el refresco en vivo del panel de convocatorias del entrenador) y, desde la Fase 6, **`announcements`** (para el refresco en vivo de la Cartelera, §7.13). `useClubData` también se suscribe a cambios de esquema para refrescar el store demo.
 
 ### 8.5 Saneamiento de migraciones (Fase 0)
 
@@ -470,6 +497,17 @@ Añadidas de forma aditiva e idempotente, coherentes con las políticas RLS exis
 - `20260722100300_dorsales_tallas.sql` — `player_teams.dorsal` (+ índice único parcial por equipo), RPC `set_player_dorsal`, `teams.travels` y tabla `equipment_sizes` (+ RLS + trigger).
 - `20260722100400_players_documents.sql` — columnas `players.federativa_pdf_url`, `players.photo_url`, `players.id_document_url`, `players.id_document_type` (con `CHECK` a `DNI`/`NIE`/`Pasaporte`/`DNI tutor`) y `players.id_document_number`; política de Storage `player_docs_admin_all` (acceso total del admin al bucket `player-docs` para subir la documentación por jugador).
 
+### 8.7 Migraciones de la Fase 6 y de accesos por usuario
+
+- `20260722100400_announcements.sql` — tabla **`announcements`** (cartelera del club: título, cuerpo, `pinned`, `author_id`) + RLS (autenticados leen; admin/coach gestionan firmando su `uid`) + trigger de `updated_at` + alta en la publicación `supabase_realtime`. *(Nota: comparte marca de tiempo con `players_documents` pero es una migración distinta.)*
+- `20260723100000_matches.sql` — tabla `matches` de la Fase 1 (ver §8.2), con siembra de partidos de ejemplo.
+- `20260723110000_username_and_provisioning.sql` — columna **`profiles.username`** (+ índice único case-insensitive), `handle_new_user` actualizada para copiar `username`, tabla **`provisioned_credentials`** (+ RLS solo admin) y la RPC **`clear_my_provisioned_password`**. Da soporte al login por usuario (§5.4) y a la provisión de cuentas (§7.20).
+- `20260723120000_enable_rls_disabled_tables.sql` — **reactiva Row Level Security** en tablas que tenían políticas definidas pero RLS apagado desde el dashboard (`club_events`, `coach_teams`, `families_meta`, `players`, `private_messages`, `profiles`, `standings`, `team_messages`, `teams`, `user_roles`). Idempotente.
+
+### 8.8 Edge Functions (`supabase/functions/`)
+
+- **`admin-provision-parents`** — función `service_role` que crea cuentas de padre/tutor a partir de una lista de jugadores (§7.20). Verifica que el llamante es admin (consultando `user_roles`), genera usuario único + contraseña temporal + email sintético, marca `must_change_password`, vincula/crea la familia y el jugador, y persiste las credenciales en `provisioned_credentials`. El dominio sintético (`sbtmaspalomas.local`) debe coincidir con `SYNTHETIC_EMAIL_DOMAIN` de `src/lib/username.ts`.
+
 ---
 
 ## 9. Reglas de negocio destacadas
@@ -483,24 +521,32 @@ Añadidas de forma aditiva e idempotente, coherentes con las políticas RLS exis
 - **PIN de adulto** configurable por familia (`adult_pin`), con fallback demo `1234`.
 - **Canal de difusión**: solo escriben admin/coach; las familias lo tienen en modo lectura.
 - **Ciclo de vida de los chats**: el admin puede activar/desactivar, cerrar (solo lectura), archivar (ocultar) o eliminar cualquier canal; la ausencia de configuración equivale a activo y abierto.
+- **Acceso por usuario o email**: en el login, un texto sin `@` se trata como **nombre de usuario** y se convierte al email sintético `<usuario>@sbtmaspalomas.local`; con `@`, como email normal.
+- **Cuentas provisionadas por el club**: el admin puede generar usuario + contraseña temporal para los tutores (§7.20). Esas cuentas **deben cambiar la contraseña** en el primer acceso (`/set-password`), momento en el que la contraseña temporal se borra de forma permanente.
 
 ---
 
 ## 10. Estado del desarrollo, deuda técnica y pendientes
 
-**Implementado y funcional** (contra Supabase): autenticación, registro federativo con tipos de usuario (responsable/senior/coach/staff), validación documental, gestión de equipos, asignación de jugadores (multi-equipo), gestión de miembros/roles, pagos con cuotas editables (admin y familia), chats en tiempo real (team/family/broadcast/privado + canales de rol) y su gestión por el admin, selector de familia con PIN, avatares.
+**Implementado y funcional** (contra Supabase): autenticación por **email o nombre de usuario** y **provisión de cuentas de familias** por el admin con cambio de contraseña obligatorio en el primer acceso, registro federativo con tipos de usuario (responsable/senior/coach/staff), validación documental, gestión de equipos, asignación de jugadores (multi-equipo), gestión de miembros/roles, alta e importación de jugadores (manual/CSV/fotos ZIP) y documentación por jugador, pagos con cuotas editables (admin y familia), **partidos/calendario reales** (`matches`), **convocatorias completas** con doblado y mínimo federativo, **asistencia persistida** (`attendance`), dorsales y tallas, **Cartelera del club real** (`announcements`), y chats en tiempo real (team/family/broadcast/privado + canales de rol) y su gestión por el admin, selector de familia con PIN, avatares.
 
 **Saldado en la Fase 0** (saneamiento previo):
 - ✅ **Migraciones versionadas**: `registrations`, `payments`, `convocatorias`, `convocatoria_responses` (y los objetos que vivían en `supabase/manual/`: columnas de `players`, `player_teams`, bucket `player-docs`, RPC de rol) ya están en `supabase/migrations/` — ver §8.5. `chat_channels` ya estaba versionada.
 - ✅ **Tipos sin `as any`**: `types.ts` completado (columnas del semáforo por documento de `registrations`) y retirados los accesos `as any` sobre estas tablas. Queda un único `as any` residual sobre `players.id_card_number`, columna heredada inexistente en el esquema real (lectura legada tolerada en `use-club-data`).
 - ✅ **Convocatorias con `useAuth`**: `created_by` = `user.id` y `player_id` = jugador del perfil activo; ya no hay placeholders `current_user_id`/`current_player_id`.
 
+**Saldado después de la Fase 0**:
+- ✅ **Asistencia persistida** en Supabase (`attendance`, §7.8) — ya no vive en localStorage.
+- ✅ **Partidos/Calendario reales** (`matches`, §7.9/§7.19) — `PlayerView` y `MatchesManager` leen la tabla real; el *demo store* ya no guarda partidos.
+- ✅ **Cartelera del club** (`announcements`, §7.13) — `NewsBoard` es funcional; ya no es placeholder.
+
 **Puntos de atención / deuda técnica pendiente**:
-1. **Asistencia en localStorage**: `Attendance.tsx` no persiste en base de datos todavía.
-2. **Partidos en datos demo**: la **Jornada** y el **Calendario** de `PlayerView` leen `matches` del *demo store* (`localStorage`), array que hoy arranca vacío y **no se hidrata** desde Supabase. Es el núcleo del **Módulo 6 (Calendario/GesDeportiva)** pendiente — ver [`ROADMAP.md`](./ROADMAP.md).
-3. **Secciones "Próximamente"**: Galería y Stats en `PlayerView`, y `NewsBoard` (tablón general).
-4. **Componentes no enlazados**: `PlayersList.tsx` existe como base pero no está en la navegación actual.
-5. El botón *"Reiniciar datos demo"* en la cabecera resetea el store local (utilidad de desarrollo).
+1. **Importación de Excel de partidos**: el botón existe pero está **deshabilitado** ("Próximamente"); falta el UPSERT por `match_number` (§7.19).
+2. **Secciones "Próximamente" en `PlayerView`**: Galería y Stats siguen como placeholders (§7.9).
+3. **Tienda / consola de pedidos de equipación**: dorsales y tallas están, pero falta la logística de pedidos a fábrica (Módulo 9, ver [`ROADMAP.md`](./ROADMAP.md)).
+4. **Componentes no enlazados**: `PlayersList.tsx` y `Board.tsx` existen como base pero no están en la navegación actual.
+5. **Un `as any` residual** sobre `players.id_card_number` (columna heredada) tolerado en `use-club-data`.
+6. El botón *"Reiniciar datos demo"* en la cabecera resetea el store local (utilidad de desarrollo).
 
 > El plan priorizado de lo que falta (Calendario/GesDeportiva, Equipaciones, Ficha Federativa PDF, Convocatorias completas, Asistencia en Supabase, etc.) se mantiene en [`ROADMAP.md`](./ROADMAP.md).
 
@@ -543,7 +589,7 @@ src/
 │       ├── route.tsx          # Guard de sesión
 │       └── index.tsx          # ClubApp (app principal)
 ├── components/
-│   ├── club/                  # Módulos de dominio (19 componentes)
+│   ├── club/                  # Módulos de dominio (24 componentes)
 │   │   ├── RegistrationFlow.tsx   ValidationConsole.tsx
 │   │   ├── Payments.tsx           CuotaAnual.tsx
 │   │   ├── Chats.tsx              ChatsManager.tsx
@@ -552,12 +598,18 @@ src/
 │   │   ├── ConvocatoriesManager.tsx  ConvocatoriesPlayer.tsx
 │   │   ├── PlayerView.tsx         FamilySelector.tsx
 │   │   ├── AvatarUpload.tsx       SignaturePad.tsx
-│   │   ├── NewsBoard.tsx          Board.tsx  PlayersList.tsx
+│   │   ├── FamilyProvisioning.tsx FederativaDoc.tsx
+│   │   ├── PlayerDocuments.tsx    PlayerImport.tsx
+│   │   ├── DorsalManager.tsx      EquipmentSizes.tsx
+│   │   ├── MatchesManager.tsx     NewsBoard.tsx
+│   │   ├── Board.tsx              PlayersList.tsx
 │   └── ui/                    # shadcn/ui (primitivas)
 ├── lib/
 │   ├── auth-context.tsx       # AuthProvider + perfiles de familia + roles
 │   ├── clubStore.ts           # Store demo (localStorage)
 │   ├── chatChannels.ts        # Claves/estado efectivo de canales de chat
+│   ├── username.ts            # Login unificado email / nombre de usuario
+│   ├── playersCsv.ts, zip.ts, matches.ts
 │   └── utils.ts, error-*.ts
 ├── hooks/
 │   ├── use-club-data.tsx      # Hidratación del store desde Supabase
@@ -569,8 +621,9 @@ src/
 └── server.ts, start.ts, router.tsx
 
 supabase/migrations/           # Esquema, RLS, triggers, funciones, seeds
+supabase/functions/            # Edge Functions (admin-provision-parents)
 ```
 
 ---
 
-*Documento generado a partir del análisis del código fuente. Última revisión: 2026-07-21 (rama `claude/plan-roadmap-phases-2-5-53sozm`). El plan de trabajo pendiente vive en [`ROADMAP.md`](./ROADMAP.md).*
+*Documento generado a partir del análisis del código fuente. Última revisión: 2026-07-23 (rama `claude/user-manual-comprehensive-wsuvrt`). El plan de trabajo pendiente vive en [`ROADMAP.md`](./ROADMAP.md).*
