@@ -245,14 +245,22 @@ export function Chats() {
       .on("postgres_changes",
         channel.kind === "private"
           ? { event: "INSERT", schema: "public", table: "private_messages", filter: `receiver_family_id=eq.${channel.familyId}` }
-          : { event: "INSERT", schema: "public", table: "team_messages", filter: channel.teamId ? `team_id=eq.${channel.teamId}` : `channel_type=eq.${channel.kind}` },
+          : channel.teamId
+            ? { event: "INSERT", schema: "public", table: "team_messages", filter: `team_id=eq.${channel.teamId}` }
+            // Difusión: sin team_id, no filtramos por columna en el servidor. El filtro
+            // por channel_type no entrega los eventos de forma fiable, así que
+            // escuchamos todos los INSERT (RLS ya limita las filas visibles) y
+            // filtramos por channel_type en el cliente, más abajo.
+            : { event: "INSERT", schema: "public", table: "team_messages" },
         (payload) => {
           if (channel.kind === "private") {
-            setPrivateMsgs((prev) => [...prev, payload.new as PrivateMsg]);
+            const msg = payload.new as PrivateMsg;
+            setPrivateMsgs((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
           } else {
             const msg = payload.new as GroupMsg;
             if (msg.channel_type !== channel.kind) return;
-            setGroupMsgs((prev) => [...prev, msg]);
+            if (channel.teamId && msg.team_id !== channel.teamId) return;
+            setGroupMsgs((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
           }
           setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 30);
         },
@@ -266,15 +274,38 @@ export function Chats() {
     if (!user || !channel || !text.trim()) return;
     const body = text.trim();
     setText("");
+    const scrollToEnd = () => setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 30);
+    // Añadimos el mensaje al estado a partir de la fila devuelta por la BD (no de un
+    // id temporal): así aparece de inmediato en todos los canales —incluido el de
+    // difusión, donde el eco de realtime no llega de forma fiable— y la
+    // deduplicación por id evita duplicados cuando además sí llegue el evento.
     if (channel.kind === "private" && channel.familyId) {
-      await supabase.from("private_messages").insert({
-        sender_id: user.id, receiver_family_id: channel.familyId, message_text: body,
-      });
+      const { data, error } = await supabase
+        .from("private_messages")
+        .insert({ sender_id: user.id, receiver_family_id: channel.familyId, message_text: body })
+        .select("id, sender_id, receiver_family_id, message_text, is_read, created_at")
+        .single();
+      if (error) { console.error("Chats: error enviando mensaje privado", error); setText(body); return; }
+      if (data) {
+        const msg = data as PrivateMsg;
+        setPrivateMsgs((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+        scrollToEnd();
+      }
     } else {
-      await supabase.from("team_messages").insert({
-        channel_type: channel.kind, team_id: channel.teamId ?? null,
-        sender_id: user.id, sender_name: fullName || user.email || "Usuario", message_text: body,
-      });
+      const { data, error } = await supabase
+        .from("team_messages")
+        .insert({
+          channel_type: channel.kind, team_id: channel.teamId ?? null,
+          sender_id: user.id, sender_name: fullName || user.email || "Usuario", message_text: body,
+        })
+        .select("id, channel_type, team_id, sender_id, sender_name, message_text, created_at")
+        .single();
+      if (error) { console.error("Chats: error enviando mensaje", error); setText(body); return; }
+      if (data) {
+        const msg = data as GroupMsg;
+        setGroupMsgs((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+        scrollToEnd();
+      }
     }
   }, [user, channel, text, fullName]);
 
