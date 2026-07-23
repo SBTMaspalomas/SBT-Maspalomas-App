@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast, Toaster } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
+import { useLogoUrl } from "@/hooks/use-branding";
 
 function PasswordInput({ id, value, onChange, minLength }: { id: string; value: string; onChange: (v: string) => void; minLength?: number }) {
   const [show, setShow] = useState(false);
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { logoUrl } = useLogoUrl();
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -115,7 +117,7 @@ function AuthPage() {
       <Toaster theme="dark" position="top-center" />
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <img src="https://kiifznmcpyvalupdtnrq.supabase.co/storage/v1/object/public/avatars/SBT%20logo-.png" alt="SBT Maspalomas" className="mx-auto h-16 w-16 rounded-full object-cover" />
+          <img src={logoUrl} alt="SBT Maspalomas" className="mx-auto h-16 w-16 rounded-full object-cover" />
           <h1 className="text-2xl font-black uppercase tracking-wider">SBT Maspalomas</h1>
           <p className="text-sm text-muted-foreground">El Baloncesto en el Sur · Gran Canaria</p>
         </div>
