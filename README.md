@@ -65,3 +65,4 @@ src/
 ## Licencia
 
 Privado - SBT Maspalomas
+(Actualizar Vercel)
