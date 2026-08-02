@@ -85,7 +85,7 @@ export function FamilySelector() {
             </>
           ) : (
             <>
-              <h1 className="mt-1 text-3xl font-black sm:text-4xl">¿Quién está viendo?</h1>
+              <h1 className="mt-1 text-3xl font-black sm:text-4xl">Escoge tu avatar para entrar</h1>
               <p className="mt-2 text-sm text-muted-foreground">Selecciona un perfil</p>
             </>
           )}
@@ -104,7 +104,7 @@ export function FamilySelector() {
           ))}
           {children.length === 0 && (
             <div className="col-span-1 rounded-2xl border border-dashed border-border bg-surface p-4 text-center text-xs text-muted-foreground sm:col-span-3">
-              Aún no hay hijos vinculados a esta cuenta. Completa el registro federativo para inscribir a tus hijos.
+              Aún no hay hijos vinculados a esta cuenta. Completa el registro de usuario para inscribir a tus hijos.
             </div>
           )}
         </div>

@@ -112,9 +112,11 @@ function fmt(v: number | null): string {
 
 function CuotaCard({ schedule }: { schedule: FeeSchedule }) {
   const rows: { label: string; values: (number | null)[] }[] = [
-    { label: "Pago único", values: [schedule.single, null, null] },
-    { label: "Tres pagos", values: [...schedule.installments] },
+    { label: "TRES PAGOS", values: [...schedule.installments] },
+    { label: "PAGO ÚNICO", values: [schedule.single, null, null] },
   ];
+  const totalInstallments =
+    schedule.installments[0] + schedule.installments[1] + schedule.installments[2];
 
   return (
     <Card className="overflow-hidden">
@@ -126,25 +128,32 @@ function CuotaCard({ schedule }: { schedule: FeeSchedule }) {
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead>
+          <tbody>
             <tr className="text-muted-foreground">
-              <th className="px-4 py-2 text-left font-medium">Fecha límite</th>
+              <td className="px-4 py-2 text-left font-medium uppercase">FECHA LÍMITE</td>
               {schedule.deadlines.map((d, i) => (
-                <th key={i} className="px-3 py-2 text-right font-medium tabular-nums">{d}</th>
+                <td key={i} className="px-3 py-2 text-right font-medium tabular-nums">
+                  {d}
+                </td>
               ))}
             </tr>
-          </thead>
-          <tbody>
             {rows.map((row) => (
               <tr key={row.label} className="border-t border-border">
-                <td className="px-4 py-2 font-medium">{row.label}</td>
+                <td className="px-4 py-2 text-left font-medium uppercase">{row.label}</td>
                 {row.values.map((v, i) => (
-                  <td key={i} className="px-3 py-2 text-right tabular-nums">{fmt(v)}</td>
+                  <td key={i} className="px-3 py-2 text-right tabular-nums">
+                    {fmt(v)}
+                  </td>
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="border-t border-border px-4 py-2 text-left text-xs text-muted-foreground">
+        Importe total en tres plazos:{" "}
+        <span className="font-semibold text-foreground tabular-nums">{totalInstallments}€</span>
       </div>
     </Card>
   );
@@ -292,7 +301,9 @@ export function FeeSchedulesEditor() {
                   </div>
 
                   <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-2 text-sm">
-                    <div className="text-xs text-muted-foreground">Fecha límite</div>
+                    <div className="text-left text-xs font-medium uppercase text-muted-foreground">
+                      FECHA LÍMITE
+                    </div>
                     {[0, 1, 2].map((i) => (
                       <Input
                         key={`d-${i}`}
@@ -307,17 +318,9 @@ export function FeeSchedulesEditor() {
                       />
                     ))}
 
-                    <div className="text-xs text-muted-foreground">Pago único (€)</div>
-                    <Input
-                      className="h-8 text-center tabular-nums"
-                      inputMode="decimal"
-                      value={f.single}
-                      onChange={(e) => update(t, { single: e.target.value })}
-                    />
-                    <div className="text-center text-xs text-muted-foreground">—</div>
-                    <div className="text-center text-xs text-muted-foreground">—</div>
-
-                    <div className="text-xs text-muted-foreground">Tres pagos (€)</div>
+                    <div className="text-left text-xs font-medium uppercase text-muted-foreground">
+                      TRES PAGOS
+                    </div>
                     {[0, 1, 2].map((i) => (
                       <Input
                         key={`p-${i}`}
@@ -331,10 +334,23 @@ export function FeeSchedulesEditor() {
                         }}
                       />
                     ))}
+
+                    <div className="text-left text-xs font-medium uppercase text-muted-foreground">
+                      PAGO ÚNICO
+                    </div>
+                    <Input
+                      className="h-8 text-center tabular-nums"
+                      inputMode="decimal"
+                      value={f.single}
+                      onChange={(e) => update(t, { single: e.target.value })}
+                    />
+                    <div className="text-center text-xs text-muted-foreground">—</div>
+                    <div className="text-center text-xs text-muted-foreground">—</div>
                   </div>
 
-                  <div className="mt-2 text-right text-xs text-muted-foreground">
-                    Total a plazos: <span className="font-semibold text-foreground tabular-nums">
+                  <div className="mt-2 text-left text-xs text-muted-foreground">
+                    Importe total en tres plazos:{" "}
+                    <span className="font-semibold text-foreground tabular-nums">
                       {(num(f.installments[0]) + num(f.installments[1]) + num(f.installments[2])) || 0}€
                     </span>
                   </div>

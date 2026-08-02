@@ -19,7 +19,7 @@ const SIZE_OPTIONS = ["4", "6", "8", "10", "12", "14", "16", "XS", "S", "M", "L"
 
 // La equipación reversible es común a todos; el resto sólo para equipos que viajan.
 const BASE_FIELDS: { field: SizeField; label: string }[] = [
-  { field: "reversible_size", label: "Equipación reversible" },
+  { field: "reversible_size", label: "Talla" },
 ];
 const TRAVEL_FIELDS: { field: SizeField; label: string }[] = [
   { field: "tracksuit_size", label: "Chándal" },
@@ -127,7 +127,7 @@ export function EquipmentSizes({ playerId }: { playerId?: string } = {}) {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-bold">Tallas / Equipación</h2>
+        <h2 className="text-lg font-bold">Talla equipación</h2>
         <p className="text-sm text-muted-foreground">
           Indica las tallas de cada jugador. Los equipos que viajan añaden el pack completo de ropa.
         </p>
@@ -168,7 +168,7 @@ export function EquipmentSizes({ playerId }: { playerId?: string } = {}) {
               </div>
               <div className="flex justify-end">
                 <Button size="sm" disabled={savingId === player.id} onClick={() => save(player.id)}>
-                  {savingId === player.id ? "Guardando…" : "Guardar tallas"}
+                  {savingId === player.id ? "Guardando…" : "Guardar talla"}
                 </Button>
               </div>
             </CardContent>
