@@ -384,7 +384,7 @@ export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-muted-foreground">Deuda pendiente</div>
+            <div className="text-xs text-muted-foreground">Importe pendiente</div>
             <div className="text-2xl font-bold text-orange-600">{pendingAmount.toFixed(2)}€</div>
           </div>
         </div>
@@ -393,7 +393,7 @@ export function PaymentsParent({ playerId }: { playerId?: string } = {}) {
       {/* Amount Cards */}
       <div className="grid grid-cols-3 gap-2">
         <Card className="p-3">
-          <div className="text-xs text-muted-foreground">Total</div>
+          <div className="text-xs text-muted-foreground">Importe total</div>
           <div className="text-lg font-bold">{totalAmount.toFixed(2)}€</div>
         </Card>
         <Card className="p-3 border-green-200">

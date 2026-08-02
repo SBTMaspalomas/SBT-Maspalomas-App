@@ -50,7 +50,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "mizona", label: "Mi zona", icon: Trophy, roles: [] },
   { id: "cartelera", label: "Cartelera", icon: Newspaper, roles: ["admin", "coach", "parent", "family", "senior", "staff"] },
   { id: "partidos", label: "Partidos", icon: CalendarDays, roles: ["admin", "coach", "parent", "family", "senior", "staff"] },
-  { id: "registro", label: "Registro federativo", icon: FileSignature, roles: ["admin", "parent", "family"] },
+  { id: "registro", label: "Registro de Usuario", icon: FileSignature, roles: ["admin", "parent", "family"] },
   { id: "federativa", label: "Ficha federativa", icon: FileText, roles: ["family", "senior"] },
   { id: "miembros", label: "Miembros", icon: Users2, roles: ["admin"] },
   { id: "cuentas", label: "Cuentas de familias", icon: KeyRound, roles: ["admin"] },
@@ -59,7 +59,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard; roles: Role[
   { id: "convocatorias", label: "Convocatorias", icon: ClipboardCheck, roles: ["admin", "coach"] },
   { id: "mis-convocatorias", label: "Mis Convocatorias", icon: ClipboardCheck, roles: ["player", "senior"] },
   { id: "dorsales", label: "Dorsales", icon: Hash, roles: ["admin", "coach"] },
-  { id: "tallas", label: "Tallas / Equipación", icon: Shirt, roles: ["family", "senior"] },
+  { id: "tallas", label: "Talla equipación", icon: Shirt, roles: ["family", "senior"] },
   { id: "validacion", label: "Validación docs.", icon: ShieldCheck, roles: ["admin"] },
   { id: "pagos", label: "Cuotas y pagos", icon: Wallet, roles: ["admin", "parent", "family", "senior"] },
   { id: "asistencia", label: "Control de asistencia", icon: ClipboardCheck, roles: ["coach"] },
@@ -158,7 +158,7 @@ function ClubApp() {
         <Toaster theme="dark" position="top-center" />
         <div className="mx-auto max-w-2xl px-4 py-8">
           <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
-            <h2 className="text-lg font-bold text-primary">Completa tu registro federativo</h2>
+            <h2 className="text-lg font-bold text-primary">Completa tu registro de usuario</h2>
             <p className="mt-1 text-sm text-muted-foreground">Para acceder a tu panel de familia, primero debes completar tus datos personales y documentación.</p>
           </div>
           <RegistrationFlow onComplete={() => setRegistrationComplete(true)} />
@@ -262,7 +262,7 @@ function ClubApp() {
                 <button
                   key={n.id}
                   onClick={() => { setView(n.id); setNavOpen(false); }}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${active ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-surface-elevated"}`}
+                  className={`flex w-full items-center justify-start gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${active ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-surface-elevated"}`}
                 >
                   <I className="h-4 w-4" />
                   {n.label}
