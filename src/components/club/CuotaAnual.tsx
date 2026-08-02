@@ -35,7 +35,7 @@ export interface FeeSchedule {
 export const FEE_TYPE_ORDER: FeeType[] = ["senior", "federado", "escuela"];
 
 export const DEFAULT_FEE_SCHEDULES: Record<FeeType, FeeSchedule> = {
-  senior: { type: "senior", label: "senior", single: 120, installments: [50, 50, 50], deadlines: ["15 Sep", "15 Nov", "15 Feb"] },
+  senior: { type: "senior", label: "senior", single: 170, installments: [100, 50, 50], deadlines: ["15 Sep", "15 Nov", "15 Feb"] },
   federado: { type: "federado", label: "federado", single: 390, installments: [175, 125, 125], deadlines: ["15 Sep", "15 Nov", "15 Feb"] },
   escuela: { type: "escuela", label: "escuela", single: 245, installments: [100, 90, 90], deadlines: ["15 Sep", "15 Nov", "15 Feb"] },
 };
