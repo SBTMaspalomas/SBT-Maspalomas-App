@@ -1,9 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useAuth, ADULT_PIN, type FamilyChild } from "@/lib/auth-context";
 import { useMatches } from "@/hooks/use-matches";
 import { type MatchRow } from "@/lib/matches";
 import { Button } from "@/components/ui/button";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
 import { UserCog, Baby, ShieldCheck, CalendarDays, ArrowLeft, LogOut, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +25,8 @@ function ageFrom(birth: string | null) {
 export function FamilySelector() {
   const auth = useAuth();
   const [mode, setMode] = useState<"pick" | "pin">("pick");
-  const [pin, setPin] = useState("");
+  const [pinDigits, setPinDigits] = useState(["", "", "", ""]);
+  const pinRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
   const family = auth.family;
   const children = family?.children ?? [];
@@ -35,16 +35,43 @@ export function FamilySelector() {
     if (auth.selectAdult(value)) {
       toast.success("Bienvenido, adulto responsable");
     } else {
-      setPin("");
+      setPinDigits(["", "", "", ""]);
+      pinRefs[0].current?.focus();
       toast.error("PIN incorrecto");
     }
   };
+
+  const handlePinDigitChange = (index: number, raw: string) => {
+    const digit = raw.replace(/\D/g, "").slice(-1);
+    const next = [...pinDigits];
+    next[index] = digit;
+    setPinDigits(next);
+    if (digit && index < 3) {
+      pinRefs[index + 1].current?.focus();
+    }
+    if (next.every((d) => d !== "")) {
+      handleSubmitPin(next.join(""));
+    }
+  };
+
+  const handlePinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !pinDigits[index] && index > 0) {
+      pinRefs[index - 1].current?.focus();
+    }
+  };
+
+  useEffect(() => {
+    if (mode === "pin") {
+      pinRefs[0].current?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   if (mode === "pin") {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-background to-surface p-6">
         <div className="mx-auto max-w-sm space-y-6 text-center">
-          <button onClick={() => { setMode("pick"); setPin(""); }} className="mx-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <button onClick={() => { setMode("pick"); setPinDigits(["", "", "", ""]); }} className="mx-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-3 w-3" /> volver a perfiles
           </button>
           <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg">
@@ -54,19 +81,22 @@ export function FamilySelector() {
             <h2 className="text-2xl font-black">Adultos Responsables</h2>
             <p className="mt-1 text-sm text-muted-foreground">Introduce el PIN de 4 dígitos para acceder.</p>
           </div>
-          <div className="flex justify-center">
-            <InputOTP
-              maxLength={4} value={pin}
-              onChange={(v) => { setPin(v); if (v.length === 4) handleSubmitPin(v); }}
-            >
-              <InputOTPGroup>
-                <InputOTPSlot index={0} className="h-14 w-14 text-xl" />
-                <InputOTPSlot index={1} className="h-14 w-14 text-xl" />
-                <InputOTPSlot index={2} className="h-14 w-14 text-xl" />
-                <InputOTPSlot index={3} className="h-14 w-14 text-xl" />
-              </InputOTPGroup>
-            </InputOTP>
-         </div>
+          <div className="flex justify-center gap-3">
+            {[0, 1, 2, 3].map((i) => (
+              <input
+                key={i}
+                ref={pinRefs[i]}
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={1}
+                value={pinDigits[i]}
+                onChange={(e) => handlePinDigitChange(i, e.target.value)}
+                onKeyDown={(e) => handlePinKeyDown(i, e)}
+                className="h-14 w-14 rounded-lg border border-input bg-background text-center text-xl focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            ))}
+          </div>
           <p className="text-[11px] text-muted-foreground">Introduce tu PIN personal de 4 dígitos.</p>
         </div>
       </div>
@@ -153,8 +183,6 @@ function ChildTile({ child, onClick }: { child: FamilyChild; onClick: () => void
 
   useEffect(() => {
     if (!child.team_id) return;
-    // team_id puede ser un UUID o un nombre (datos mixtos); cargar y emparejar por id o name
-    // para no lanzar 22P02 (invalid uuid) al filtrar por .eq("id", <nombre>).
     supabase.from("teams").select("id, name, category")
       .then(({ data }) => {
         const t = (data ?? []).find((x) => x.id === child.team_id || x.name === child.team_id);
@@ -201,8 +229,6 @@ function FamilyTeams({ children }: { children: FamilyChild[] }) {
   const [teams, setTeams] = useState<Array<{id: string; name: string; category: string}>>([]);
 
   useEffect(() => {
-    // Cargar todos los equipos y emparejar en cliente por id o name (team_id puede ser
-    // un UUID o un nombre); filtrar por .in("id", <nombres>) lanzaría 22P02.
     const teamKeys = children.map(c => c.team_id).filter(Boolean) as string[];
     if (teamKeys.length > 0) {
       supabase.from("teams").select("id, name, category")
@@ -250,13 +276,11 @@ function FamilyAgenda({ children }: { children: FamilyChild[] }) {
   useEffect(() => {
     const keys = children.map((c) => c.team_id).filter(Boolean);
     if (keys.length === 0) return;
-    // team_id del hijo puede ser UUID o nombre; se empareja en cliente.
     supabase.from("teams").select("id, name").then(({ data }) => { if (data) setTeams(data); });
   }, [children]);
 
   const items = useMemo(() => {
     if (children.length === 0) return [];
-    // UUID de equipo (principal) de cada hijo.
     const childTeamUuid = new Map<string, string | null>();
     children.forEach((c) => {
       const t = teams.find((x) => x.id === c.team_id || x.name === c.team_id);
