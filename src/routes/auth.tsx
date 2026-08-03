@@ -49,7 +49,8 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
   // If already signed in, bounce to home
   useEffect(() => {
@@ -80,7 +81,7 @@ function AuthPage() {
       email, password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: { full_name: fullName },
+        data: { first_name: firstName, last_name: lastName, full_name: `${firstName} ${lastName}` },
       },
     });
     setLoading(false);
@@ -159,9 +160,15 @@ function AuthPage() {
             <TabsContent value="signup">
               <form onSubmit={onSignup} className="space-y-4 rounded-2xl border border-border bg-surface p-5">
                 <p className="text-xs text-muted-foreground">El registro público crea una cuenta de <span className="font-semibold text-primary">Padre / Tutor</span>. Las cuentas de administrador y entrenador las gestiona el club.</p>
-                <div className="space-y-2">
-                  <Label htmlFor="sn">Nombre completo</Label>
-                  <Input id="sn" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="sfn">Nombre</Label>
+                    <Input id="sfn" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sln">Apellidos</Label>
+                    <Input id="sln" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="se">Email</Label>

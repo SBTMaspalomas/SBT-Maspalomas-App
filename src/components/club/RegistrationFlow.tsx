@@ -47,6 +47,33 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
     loadTeams();
   }, []);
 
+  // Precarga: leer datos ya existentes del perfil y user_metadata
+  useEffect(() => {
+    if (!user) return;
+    const preload = async () => {
+      // Primero intentar leer de profiles (más completo si ya pasó por paso 1 antes)
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email, phone, doc_type, doc_number")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      // Fallback a user_metadata (disponible desde el signup, antes de cualquier UPDATE)
+      const meta = user.user_metadata || {};
+
+      setAdult(prev => ({
+        ...prev,
+        firstName: profile?.first_name || meta.first_name || prev.firstName,
+        lastName: profile?.last_name || meta.last_name || prev.lastName,
+        email: profile?.email || user.email || prev.email,
+        phone: profile?.phone || prev.phone,
+        docType: profile?.doc_type || prev.docType,
+        docNumber: profile?.doc_number || prev.docNumber,
+      }));
+    };
+    preload();
+  }, [user]);
+
   // Tipo principal de usuario adulto que se registra.
   //  - responsible: ADULTO RESPONSABLE de menor(es)  → rol family
   //  - senior:      Jugador SENIOR (+18)             → rol senior
@@ -81,7 +108,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
   };
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const goFromStep1 = () => {
+  const goFromStep1 = async () => {
     if (!adult.firstName.trim() || !adult.lastName.trim()) {
       toast.error("Nombre y apellidos son obligatorios");
       return;
@@ -94,6 +121,24 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       toast.error("Introduce un email válido");
       return;
     }
+
+    // Guardado parcial: persistir datos del paso 1 en profiles
+    if (user) {
+      const { error } = await supabase.from("profiles").update({
+        full_name: `${adult.firstName.trim()} ${adult.lastName.trim()}`,
+        first_name: adult.firstName.trim(),
+        last_name: adult.lastName.trim(),
+        email: adult.email.trim(),
+        phone: adult.phone.trim() || null,
+        doc_type: adult.docType,
+        doc_number: adult.docNumber.trim(),
+      } as any).eq("id", user.id);
+      if (error) {
+        console.warn("No se pudo guardar el progreso parcial:", error.message);
+        // No bloquear el avance — el guardado final lo reintentará
+      }
+    }
+
     setStep(isResponsible ? 2 : 3);
   };
 
