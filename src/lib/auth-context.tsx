@@ -38,6 +38,7 @@ interface AuthCtx {
   selectChild: (childId: string) => void;
   clearProfile: () => void;
   signOut: () => Promise<void>;
+  reloadFamily: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx>({
@@ -45,6 +46,7 @@ const Ctx = createContext<AuthCtx>({
   family: null, activeProfile: null, selfPlayerId: null, mustChangePassword: false,
   selectAdult: () => false, selectChild: () => {}, clearProfile: () => {},
   signOut: async () => {},
+  reloadFamily: async () => {},
 });
 
 // Demo PIN for the "Adultos Responsables" profile.
@@ -226,11 +228,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const reloadFamily = useCallback(async () => {
+    if (!session?.user) return;
+    const f = await loadFamily(session.user.id);
+    setFamily(f);
+  }, [session]);
+
   return (
     <Ctx.Provider value={{
       session, user: session?.user ?? null, role, roles, fullName, loading,
       family, activeProfile, selfPlayerId, mustChangePassword,
-      selectAdult, selectChild, clearProfile, signOut,
+      selectAdult, selectChild, clearProfile, signOut, reloadFamily,
     }}>
       {children}
     </Ctx.Provider>

@@ -33,7 +33,7 @@ const FileButton = ({ label, value, onChange, accept = "image/*" }: { label: str
 );
 
 export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {}) {
-  const { user } = useAuth();
+  const { user, reloadFamily } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teams, setTeams] = useState<Array<{id: string; name: string; category: string}>>([]);
@@ -54,7 +54,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       // Primero intentar leer de profiles (más completo si ya pasó por paso 1 antes)
       const { data: profile } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email, phone, doc_type, doc_number")
+        .select("first_name, last_name, email, phone, doc_type, doc_number, birth_date")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -69,6 +69,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
         phone: profile?.phone || prev.phone,
         docType: profile?.doc_type || prev.docType,
         docNumber: profile?.doc_number || prev.docNumber,
+        birthDate: profile?.birth_date || prev.birthDate,
       }));
     };
     preload();
@@ -136,6 +137,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
         phone: adult.phone.trim() || null,
         doc_type: adult.docType,
         doc_number: adult.docNumber.trim(),
+        birth_date: adult.birthDate || null,
       } as any).eq("id", user.id);
       if (error) {
         console.warn("No se pudo guardar el progreso parcial:", error.message);
@@ -324,6 +326,8 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       if (roleErr) console.warn("No se pudo asignar el rol de registro:", roleErr.message);
 
       toast.success("Registro completado exitosamente");
+      // Recargar family para que FamilySelector tenga los hijos y el reference_code
+      await reloadFamily();
       if (onComplete) {
         onComplete();
       } else {
@@ -473,7 +477,7 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Atrás</Button>
               <Button onClick={() => {
                 // Auto-agregar hijo actual si tiene datos pero no se pulsó "Agregar"
-                if (currentChild.firstName && currentChild.lastName && currentChild.birthDate && currentChild.docNumber && currentChild.teamId && children.length === 0) {
+                if (currentChild.firstName && currentChild.lastName && currentChild.birthDate && currentChild.docNumber && currentChild.teamId) {
                   setChildren([...children, currentChild]);
                   setCurrentChild({firstName: "", lastName: "", birthDate: "", docNumber: "", teamId: ""});
                 }
