@@ -117,6 +117,10 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
       toast.error("El número de documento es obligatorio");
       return;
     }
+    if (!adult.birthDate) {
+      toast.error("La fecha de nacimiento es obligatoria");
+      return;
+    }
     if (!emailRe.test(adult.email.trim())) {
       toast.error("Introduce un email válido");
       return;
@@ -281,9 +285,11 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
           const { error: playerErr } = await supabase.from("players").insert({
             family_id: familyId,
             full_name: `${child.firstName} ${child.lastName}`,
+            first_name: child.firstName.trim(),
+            last_name: child.lastName.trim(),
             birth_date: child.birthDate,
             team_id: child.teamId || null,
-          });
+          } as any);
           if (playerErr) throw playerErr;
         }
 
@@ -301,9 +307,11 @@ export function RegistrationFlow({ onComplete }: { onComplete?: () => void } = {
         if (!existingSelf) {
           const { error: selfErr } = await supabase.from("players").insert({
             full_name: `${adult.firstName} ${adult.lastName}`,
-            birth_date: adult.birthDate || null,
+            first_name: adult.firstName.trim(),
+            last_name: adult.lastName.trim(),
+            birth_date: adult.birthDate,
             user_id: user.id,
-          });
+          } as any);
           if (selfErr) console.warn("No se pudo crear la ficha de jugador senior:", selfErr.message);
         }
       }
