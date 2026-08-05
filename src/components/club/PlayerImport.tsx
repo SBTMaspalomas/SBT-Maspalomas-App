@@ -128,14 +128,16 @@ export function PlayerImport({ onChanged }: { onChanged?: () => void } = {}) {
 function ManualAdd({ teams, onDone }: { teams: TeamRow[]; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [docType, setDocType] = useState("");
   const [docNumber, setDocNumber] = useState("");
   const [teamId, setTeamId] = useState("");
 
   const reset = () => {
-    setFullName("");
+    setFirstName("");
+    setLastName("");
     setBirthDate("");
     setDocType("");
     setDocNumber("");
@@ -143,22 +145,30 @@ function ManualAdd({ teams, onDone }: { teams: TeamRow[]; onDone: () => void }) 
   };
 
   const submit = async () => {
-    const name = fullName.trim();
-    if (!name) {
-      toast.error("El nombre completo es obligatorio");
+    const fName = firstName.trim();
+    const lName = lastName.trim();
+    if (!fName || !lName) {
+      toast.error("Nombre y apellidos son obligatorios");
+      return;
+    }
+    if (!birthDate) {
+      toast.error("La fecha de nacimiento es obligatoria");
       return;
     }
     setSaving(true);
+    const fullName = `${fName} ${lName}`;
     try {
       const { data, error } = await supabase
         .from("players")
         .insert({
-          full_name: name,
-          birth_date: birthDate || null,
+          full_name: fullName,
+          first_name: fName,
+          last_name: lName,
+          birth_date: birthDate,
           id_document_type: docType || null,
           id_document_number: docNumber.trim() || null,
           team_id: teamId || null,
-        })
+        } as any)
         .select("id")
         .single();
       if (error) throw error;
@@ -168,10 +178,10 @@ function ManualAdd({ teams, onDone }: { teams: TeamRow[]; onDone: () => void }) 
           .from("player_teams")
           .insert({ player_id: data.id, team_id: teamId })
           .then(({ error: e }) => {
-            if (e && e.code !== "23505") throw e; // ignora duplicado
+          if (e && e.code !== "23505") throw e; // ignora duplicado
           });
       }
-      toast.success(`Jugador "${name}" añadido`);
+      toast.success(`Jugador "${fullName}" añadido`);
       reset();
       setOpen(false);
       onDone();
@@ -200,17 +210,27 @@ function ManualAdd({ teams, onDone }: { teams: TeamRow[]; onDone: () => void }) 
             <DialogTitle>Nuevo jugador</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Nombre completo *</Label>
-              <Input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Nombre y apellidos"
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Nombre *</Label>
+                <Input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Nombre"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Apellidos *</Label>
+                <Input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Apellidos"
+                />
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label className="text-xs">Fecha de nacimiento</Label>
+                <Label className="text-xs">Fecha de nacimiento *</Label>
                 <Input
                   type="date"
                   value={birthDate}
@@ -295,8 +315,10 @@ function CsvStructureHelp({ teams }: { teams: TeamRow[] }) {
         <Info className="h-4 w-4" /> Estructura del CSV
       </div>
       <p className="text-muted-foreground">
-        La primera fila debe ser la cabecera. Separador admitido: coma (,) o punto y coma (;). Solo{" "}
-        <span className="font-semibold text-foreground">nombre_completo</span> es obligatorio.
+        La primera fila debe ser la cabecera. Separador admitido: coma (,) o punto y coma (;).{" "}
+        <span className="font-semibold text-foreground">nombre</span>,{" "}
+        <span className="font-semibold text-foreground">apellidos</span> y{" "}
+        <span className="font-semibold text-foreground">fecha_nacimiento</span> son obligatorios.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -309,8 +331,9 @@ function CsvStructureHelp({ teams }: { teams: TeamRow[] }) {
           </thead>
           <tbody className="align-top">
             {[
-              ["nombre_completo", "Sí", "Nombre y apellidos. Ej: Juan Pérez García"],
-              ["fecha_nacimiento", "No", "AAAA-MM-DD o DD/MM/AAAA. Ej: 2012-05-14"],
+              ["nombre", "Sí", "Nombre de pila. Ej: Juan"],
+              ["apellidos", "Sí", "Apellidos. Ej: Pérez García"],
+              ["fecha_nacimiento", "Sí", "AAAA-MM-DD o DD/MM/AAAA. Ej: 2012-05-14"],
               ["tipo_documento", "No", `Uno de: ${CSV_DOC_TYPES.join(", ")}`],
               ["numero_documento", "No", "Ej: 12345678A (sirve para vincular la foto)"],
               [
@@ -454,11 +477,13 @@ function CsvImport({
           .from("players")
           .insert({
             full_name: row.full_name,
+            first_name: row.first_name,
+            last_name: row.last_name,
             birth_date: row.birth_date,
             id_document_type: row.id_document_type,
             id_document_number: row.id_document_number,
             team_id: team?.id ?? null,
-          })
+          } as any)
           .select("id")
           .single();
         if (error || !data) {

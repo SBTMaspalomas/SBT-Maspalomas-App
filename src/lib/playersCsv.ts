@@ -9,7 +9,9 @@ export interface ParsedPlayerRow {
   /** Nº de línea en el CSV (1 = cabecera), para mensajes de error. */
   line: number;
   full_name: string;
-  birth_date: string | null; // ISO YYYY-MM-DD o null
+  first_name: string;
+  last_name: string;
+  birth_date: string | null; // ISO YYYY-MM-DD o null (obligatorio en validación)
   id_document_type: string | null;
   id_document_number: string | null;
   team: string | null; // nombre de equipo tal cual aparece en el CSV
@@ -24,7 +26,8 @@ export interface CsvParseResult {
 
 // Plantilla descargable / de referencia mostrada al administrador.
 export const CSV_HEADERS = [
-  "nombre_completo",
+  "nombre",
+  "apellidos",
   "fecha_nacimiento",
   "tipo_documento",
   "numero_documento",
@@ -33,8 +36,8 @@ export const CSV_HEADERS = [
 
 export const CSV_TEMPLATE = [
   CSV_HEADERS.join(","),
-  "Juan Pérez García,2012-05-14,DNI,12345678A,Infantil A",
-  "Lucía Santana Díaz,2010-11-02,NIE,X1234567L,Cadete B",
+  "Juan,Pérez García,2012-05-14,DNI,12345678A,Infantil A",
+  "Lucía,Santana Díaz,2010-11-02,NIE,X1234567L,Cadete B",
 ].join("\n");
 
 /** Normaliza una cadena para comparaciones robustas (sin acentos, minúsculas). */
@@ -108,10 +111,14 @@ function parseDate(raw: string): { value: string | null; error?: string } {
 
 // Alias aceptados por columna (normalizados) → clave canónica.
 const HEADER_ALIASES: Record<string, string> = {
-  nombre: "nombre_completo",
-  nombre_completo: "nombre_completo",
-  nombrecompleto: "nombre_completo",
-  jugador: "nombre_completo",
+  nombre: "nombre",
+  nombre_completo: "nombre",
+  nombrecompleto: "nombre",
+  jugador: "nombre",
+  first_name: "nombre",
+  apellidos: "apellidos",
+  apellido: "apellidos",
+  last_name: "apellidos",
   fecha_nacimiento: "fecha_nacimiento",
   fechanacimiento: "fecha_nacimiento",
   nacimiento: "fecha_nacimiento",
@@ -145,11 +152,18 @@ export function parsePlayersCsv(text: string): CsvParseResult {
   const rawHeaders = splitLine(headerLine, sep).map((h) => normalizeKey(h));
   const cols = rawHeaders.map((h) => HEADER_ALIASES[h] ?? h);
 
-  const idxName = cols.indexOf("nombre_completo");
+  const idxName = cols.indexOf("nombre");
+  const idxLastName = cols.indexOf("apellidos");
   if (idxName < 0) {
     return {
       rows: [],
-      fatal: 'Falta la columna obligatoria "nombre_completo" en la cabecera del CSV',
+      fatal: 'Falta la columna obligatoria "nombre" en la cabecera del CSV',
+    };
+  }
+  if (idxLastName < 0) {
+    return {
+      rows: [],
+      fatal: 'Falta la columna obligatoria "apellidos" en la cabecera del CSV',
     };
   }
   const idxBirth = cols.indexOf("fecha_nacimiento");
@@ -162,14 +176,19 @@ export function parsePlayersCsv(text: string): CsvParseResult {
     const cells = splitLine(lines[i], sep);
     const errors: string[] = [];
 
-    const full_name = (cells[idxName] ?? "").trim();
-    if (!full_name) errors.push("Nombre vacío");
+    const first_name = (cells[idxName] ?? "").trim();
+    const last_name = (cells[idxLastName] ?? "").trim();
+    if (!first_name) errors.push("Nombre vacío");
+    if (!last_name) errors.push("Apellidos vacío");
+    const full_name = `${first_name} ${last_name}`.trim();
 
     let birth_date: string | null = null;
-    if (idxBirth >= 0) {
+    if (idxBirth >= 0 && (cells[idxBirth] ?? "").trim()) {
       const res = parseDate(cells[idxBirth] ?? "");
       birth_date = res.value;
       if (res.error) errors.push(res.error);
+    } else {
+      errors.push("Fecha de nacimiento obligatoria");
     }
 
     let id_document_type: string | null = null;
@@ -189,6 +208,8 @@ export function parsePlayersCsv(text: string): CsvParseResult {
     rows.push({
       line: i + 1,
       full_name,
+      first_name,
+      last_name,
       birth_date,
       id_document_type,
       id_document_number,
